@@ -1,7 +1,7 @@
 /*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified for cup by Virtex
+Modified to EnduranceCup by Virtex (fsxelw)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

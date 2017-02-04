@@ -1,4 +1,4 @@
-# Modified Records Eyepiece for Endurance(Cup) game mode [TM2]
+# Modified Records Eyepiece for Endurance(Cup) [TM2]
 
 ## Warning
 

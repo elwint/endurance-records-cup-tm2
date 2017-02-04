@@ -235,7 +235,9 @@ Aseco::addChatCommand('setrounds', 'Set the amount of endurance rounds (default:
 Aseco::addChatCommand('switch', 'Switch between TimeAttack and EnduranceCup');
 Aseco::addChatCommand('resetpoints', 'Reset total points');
 
-global $re_config, $re_scores, $re_cache, $enduscore, $reloc, $rounds, $roundsdone, $enduro;
+global $re_config, $re_scores, $re_cache, $enduscore, $reloc, $rounds, $roundsdone, $enduro, $enduro_points;
+
+$enduro_points = array(15,12,10,8,6,5,4,3,2,1);
 
 $reloc = true;
 $enduscore = array();
@@ -4928,52 +4930,29 @@ function re_onBeginRound ($aseco) {
 */
 
 function re_onEndRound ($aseco) {
-	global $re_config, $re_cache, $rounds, $roundsdone, $enduro;
+	global $re_config, $re_cache, $rounds, $roundsdone, $enduro, $enduro_points;
 
 if ($enduro) {
 	
 	$aseco->client->query('GetCurrentRanking', 200, 0);
 	$race = $aseco->client->getResponse();
 
+	$ex = 0;
 	for ($i=0; $i < count($race); $i++) {
-		$pointsget = 0;
-		if ($race[$i]['Rank'] == 1) {
-			$pointsget = 15;
+		if (isset($aseco->server->players->player_list[$race[$i]['Login']])) {
+			$player = $aseco->server->players->player_list[$race[$i]['Login']];
+			if ($player->isspectator == 0) {
+				$pointsget = 0;
+				if (isset($enduro_points[$ex])) {
+					$pointsget = $enduro_points[$ex];
+				} else {
+					$pointsget = 0;
+					continue;
+				}
+				$ex++;
+				addPoints($player, $pointsget);
+			}
 		}
-		elseif ($race[$i]['Rank'] == 2) {
-			$pointsget = 12;
-		}
-		elseif ($race[$i]['Rank'] == 3) {
-			$pointsget = 10;
-		}
-		elseif ($race[$i]['Rank'] == 4) {
-			$pointsget = 8;
-		}
-		elseif ($race[$i]['Rank'] == 5) {
-			$pointsget = 6;
-		}
-		elseif ($race[$i]['Rank'] == 6) {
-			$pointsget = 5;
-		}
-		elseif ($race[$i]['Rank'] == 7) {
-			$pointsget = 4;
-		}
-		elseif ($race[$i]['Rank'] == 8) {
-			$pointsget = 3;
-		}
-		elseif ($race[$i]['Rank'] == 9) {
-			$pointsget = 2;
-		}
-		elseif ($race[$i]['Rank'] == 10) {
-			$pointsget = 1;
-		}
-		else {
-			$pointsget = 0;
-			continue;
-		}
-		
-		$player = $aseco->server->players->player_list[$race[$i]['Login']];
-		addPoints($player, $pointsget);
 	}
 
 	getPoints();
@@ -5020,7 +4999,7 @@ function getPoints() {
 			$i = 0;
 			while ($row = mysql_fetch_object($result)) {
 				$enduscore[$i]['name'] = $row->Login;
-				$enduscore[$i]['nname'] = re_handleSpecialChars($row->NickName);
+				$enduscore[$i]['nname'] = $row->NickName;
 				$enduscore[$i]['points'] = (int)$row->RoundPoints;
 				$i++;
 			}
