@@ -1,5 +1,10 @@
 <?php
 
+global $re_config, $re_scores, $re_cache, $enduscore, $reloc, $rounds, $roundsdone, $enduro, $enduro_normal, $enduro_points, $enduro_points_last;
+
+$enduro_points = array(15,12,10,8,6,5,4,3,2,1); // Rounds points array
+$enduro_points_last = 0; // Points given to finished players outside the array
+
 /*
  * Plugin: Records Eyepiece
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -14,6 +19,7 @@
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
+ * Modified by Virtex (fsxelw) (EnduranceCup)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -30,20 +36,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * ----------------------------------------------------------------------------------
- *
- * Dependencies:
- *  - plugins/plugin.localdatabase_enduro.php		Required, for Datasbase access and LocalRecordsWidget
- *  - plugins/plugin.mxinfo.php			Required, for MapWidget, MXMapInfoWindow and <placement>-Placeholder
- *  - plugins/plugin.rasp_jukebox.php		Required, for MaplistWindow
- *  - plugins/plugin.rasp.php			Required, only if you enable the TopRankingsWidget (enabled by default) or WelcomeWindow (if <hide><ranked_player> is set to 'true')
- *  - plugins/plugin.dedimania.php		Required, only if you enable the DedimaniaWidget (enabled by default)
- *  - plugins/plugin.gerymania.php		Optional, only if you want the GerymaniaWidget (only for Gamemode 'Stunts'. Get it here: http://www.tm-forum.com/viewtopic.php?f=127&t=27398)
- *  - plugins/plugin.donate.php			Optional, only if you want the TopDonators or the DonationWidget at Score
- *  - plugins/plugin.musicserver.php		Optional, only if you want the MusicWidget
- *  - plugins/plugin.nouse.betting.php		Optional, only if you want the Betwins-Widget at Score. Get it here: http://www.tm-forum.com/viewtopic.php?f=127&t=29414
- *  - plugins/plugin.rpoints.php		Recommended, useful if you want to setup own point limits in the RoundScoreWidget
- *  - plugins/plugin.tm-karma-dot-com.php	Recommended, useful if you want to have the Karma-Widget. Get it here: http://www.tm-forum.com/viewtopic.php?f=127&t=22876
- *  - plugins/plugin.alternate_scoretable.php	Recommended, useful for Live-Rankings. Get it here: http://www.tm-forum.com/viewtopic.php?f=127&t=26138
  */
 
 /* The following manialink id's are used in this plugin (the 918 part of id can be changed on trouble):
@@ -232,24 +224,21 @@ Aseco::addChatCommand('estat',				'Display one of the MoreRankingLists (see: /ey
 Aseco::addChatCommand('eyeset',				'Adjust some settings for the Records-Eyepiece plugin (see: /eyepiece)', true);
 
 Aseco::addChatCommand('setrounds', 'Set the amount of endurance rounds (default: 3)');
-Aseco::addChatCommand('switch', 'Switch between TimeAttack and EnduranceCup');
 Aseco::addChatCommand('resetpoints', 'Reset total points');
-
-global $re_config, $re_scores, $re_cache, $enduscore, $reloc, $rounds, $roundsdone, $enduro, $enduro_points;
-
-$enduro_points = array(15,12,10,8,6,5,4,3,2,1);
-
-$reloc = true;
-$enduscore = array();
-$rounds = 3;
-$roundsdone = 0;
-$enduro = false;
+Aseco::addChatCommand('switch', 'Switch to another script');
 
 /*
 #///////////////////////////////////////////////////////////////////////#
 #									#
 #///////////////////////////////////////////////////////////////////////#
 */
+
+$reloc = true;
+$enduscore = array();
+$rounds = 3;
+$roundsdone = 0;
+$enduro = false;
+$enduro_normal = false;
 
 function re_onSync ($aseco, $reload = null) {
 	global $re_config, $re_scores, $re_cache;
@@ -4930,27 +4919,28 @@ function re_onBeginRound ($aseco) {
 */
 
 function re_onEndRound ($aseco) {
-	global $re_config, $re_cache, $rounds, $roundsdone, $enduro, $enduro_points;
+	global $re_config, $re_cache, $rounds, $roundsdone, $enduro, $enduro_points, $enduro_points_last;
 
 if ($enduro) {
 	
 	$aseco->client->query('GetCurrentRanking', 200, 0);
 	$race = $aseco->client->getResponse();
 
-	$ex = 0;
+	$e = 0;
 	for ($i=0; $i < count($race); $i++) {
 		if (isset($aseco->server->players->player_list[$race[$i]['Login']])) {
 			$player = $aseco->server->players->player_list[$race[$i]['Login']];
 			if ($player->isspectator == 0) {
-				$pointsget = 0;
-				if (isset($enduro_points[$ex])) {
-					$pointsget = $enduro_points[$ex];
+				if (isset($enduro_points[$e])) {
+					addPoints($player, $enduro_points[$e]);
+					$e++;
 				} else {
-					$pointsget = 0;
-					continue;
+					if ($enduro_points_last == 0) {
+						break;
+					} else {
+						addPoints($player, $enduro_points_last);
+					}
 				}
-				$ex++;
-				addPoints($player, $pointsget);
 			}
 		}
 	}
@@ -5047,14 +5037,20 @@ function resetPoints() {
 
 // $rounds_points is imported from plugin.rpoints.php
 function re_onBeginMap ($aseco, $map_item) {
-	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro;
+	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal;
 	
 	$aseco->client->query('GetScriptName');
 	$dat = $aseco->client->getResponse();
-	if (strpos($dat['CurrentValue'], 'EnduranceCup') !== false) {
+	if (mb_strtolower($dat['CurrentValue']) == 'endurancecup.script.txt') {
 		$enduro = true;
 	} else {
 		$enduro = false;
+	}
+	
+	if (mb_strtolower($dat['CurrentValue']) == 'endurance.script.txt') {
+		$enduro_normal = true;
+	} else {
+		$enduro_normal = false;
 	}
 
 	if ($enduro) {
@@ -7228,9 +7224,9 @@ function re_buildRecordWidgets ($target = false, $force = false) {
 
 			// Only set to false if records are loaded and displayed,
 			// but only if there are Records. If nobody reached a Record, do not try again.
-			// if ($re_config['States']['LocalRecords']['NoRecordsFound'] == false) {
-				// $re_config['States']['LocalRecords']['NeedUpdate'] = false;
-			// }
+			if ($re_config['States']['LocalRecords']['NoRecordsFound'] == false) {
+				$re_config['States']['LocalRecords']['NeedUpdate'] = false;
+			}
 
 			// Say yes to build the Widget
 			$buildLocalRecordsWidget = true;
@@ -7250,9 +7246,9 @@ function re_buildRecordWidgets ($target = false, $force = false) {
 
 			// Only set to false if records are loaded and displayed,
 			// but only if there are Players finished the map. If nobody finished this map, do not try again.
-			// if ($re_config['States']['LiveRankings']['NoRecordsFound'] == false) {
-				// $re_config['States']['LiveRankings']['NeedUpdate'] = false;
-			// }
+			if ($re_config['States']['LiveRankings']['NoRecordsFound'] == false) {
+				$re_config['States']['LiveRankings']['NeedUpdate'] = false;
+			}
 
 			// Say yes to build the Widget
 			$buildLiveRankingsWidget = true;
@@ -17676,7 +17672,7 @@ function chat_setrounds($aseco, $command) {
 }
 
 function chat_switch($aseco, $command) {
-	global $rounds, $enduro;
+	global $enduro;
 	
 	$admin = $command['author'];
 	$login = $admin->login;
@@ -17685,23 +17681,33 @@ function chat_switch($aseco, $command) {
 		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
         return;
 	}
-
-	if ($enduro) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zSwitching from EnduranceCup to TimeAttack'));
-		$aseco->console('Switching from EnduranceCup to TimeAttack');
-		$aseco->client->query('SetScriptName', 'TimeAttack');
-		$aseco->client->query('NextMap');
-	} else {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zSwitching from TimeAttack to EnduranceCup'));
-		$aseco->console('Switching from TimeAttack to EnduranceCup');
-		$aseco->client->query('SetScriptName', 'EnduranceCup');
-		$aseco->client->query('NextMap');
+	
+	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
+	if (empty($command['params'][0])) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Missing parameter: script name'), $login);
+        return;
 	}
+	
+	$aseco->client->query('GetScriptName');
+	$dat = $aseco->client->getResponse();
+	if (mb_strtolower($dat['CurrentValue']) == mb_strtolower($command['params'][0]) . '.script.txt') {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Can\'t switch to the same script!'), $login);
+        return;
+	}
+	
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zSwitching to ' . $command['params'][0]));
+	$aseco->console('Switching to ' . $command['params'][0]);
+	if ($enduro) {
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints frozen'));
+	}
+	
+	$aseco->client->query('SetScriptName', $command['params'][0]);
+	$aseco->client->query('RestartMap');
 }
 
 function chat_resetpoints($aseco, $command) {
-	global $rounds, $enduro;
-	
+	global $re_config;
+
 	$admin = $command['author'];
 	$login = $admin->login;
 		

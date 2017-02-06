@@ -1,18 +1,22 @@
 # Modified Records Eyepiece for Endurance(Cup) [TM2]
 
+Support for: `Endurance.Script.txt` & `EnduranceCup.Script.txt`
+
+Working: Local Records (+ points system)
+
+To make use of the points system, use `EnduranceCup.Script.txt`
+
 ## Warning
 
-Don't excpect it to be 100% bug free
-
-Code is kinda garbage, I modified the files a long time ago and updated it recently in a really short time
+Don't excpect it to be 100% bug free. My code is kinda garbage, I modified the files a long time ago and updated it just recently in a very short time.
 
 But at least it works :)
 
 ## Installation
 
-Place the files in the correct folders
+First place the files in the correct folders of XAseco2 and the script in the Scripts folder of your dedicated server.
 
-Edit your `plugins.xml`:
+Edit your `plugins.xml` of XAseco2:
 
 Remove:
 
@@ -38,7 +42,7 @@ with
 <plugin>plugin.records_eyepiece_enduro.php</plugin>
 ```
 
-A working example of `plugins.xml` can be found in the repository
+A working example of `plugins.xml` can be found in the repository.
 
 ## Configuration
 
@@ -47,3 +51,11 @@ The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_e
 Your config file `localdatabase.xml` will be used for `plugin.localdatabase_enduro.php`
 
 You can change the points in `plugin.localdatabase_enduro.php`
+
+## Commands
+
+/setrounds [Set the amount of endurance rounds (default: 3)]
+
+/resetpoints [Reset total points]
+
+/switch [Switch to another script]

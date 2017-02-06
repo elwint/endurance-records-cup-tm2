@@ -7,6 +7,7 @@
  * the information stored in the database!
  *
  * Updated by Xymph
+ * Modified by Virtex (fsxelw) (EnduranceCup)
  *
  * Dependencies: requires plugin.panels.php
  */
@@ -18,7 +19,8 @@ Aseco::registerEvent('onSync', 'ldb_sync');
 Aseco::registerEvent('onBeginMap', 'ldb_beginMap');
 Aseco::registerEvent('onPlayerConnect', 'ldb_playerConnect');
 Aseco::registerEvent('onPlayerDisconnect', 'ldb_playerDisconnect');
-Aseco::registerEvent('onCheckpoint', 'ldb_playerFinish');
+Aseco::registerEvent('onPlayerFinish', 'ldb_playerFinish');
+Aseco::registerEvent('onCheckpoint', 'ldb_playerCheckpoint');
 Aseco::registerEvent('onPlayerWins', 'ldb_playerWins');
 
 global $ptime;
@@ -530,35 +532,37 @@ function ldb_setPanelBG($aseco, $login, $panelbg) {
 	}
 }  // ldb_setPanelBG
 
-// called @ onPlayerFinish
-function ldb_playerFinish($aseco, $finish_item) { // Player finish is called on every checkpoint in script gamemode!
-	global $ldb_records, $ldb_settings,
-	       $checkpoints;  // from plugin.checkpoints.php
-	global $ptime, $enduro, $map_cps;
-
-	$player = $aseco->server->players->getPlayer($finish_item[1]);
-	if (($finish_item[4]+1) % $map_cps == 0) {
-		if ($enduro) {
-			if (($finish_item[4]+1) == $map_cps) {
+// called @ onCheckpoint (simulate finish in endurance)
+function ldb_playerCheckpoint($aseco, $checkpoint) {
+	global $ptime, $enduro, $enduro_normal, $map_cps;
+	
+	if ($enduro_normal || $enduro) {
+		$player = $aseco->server->players->getPlayer($checkpoint[1]);
+		if (($checkpoint[4]+1) % $map_cps == 0) {
+			if (($checkpoint[4]+1) == $map_cps) {
 				$ptime[$player->id] = 0;
 			} else if (!isset($ptime[$player->id])) {
-				$ptime[$player->id] = $finish_item[2];
+				$ptime[$player->id] = $checkpoint[2];
 				return;
 			}
-			$rtime = $finish_item[2] - $ptime[$player->id];
-			$ptime[$player->id] = $finish_item[2];
-		} else {
-			$rtime = $finish_item[2];
+			$rtime = $checkpoint[2] - $ptime[$player->id];
+			$ptime[$player->id] = $checkpoint[2];
+			
+			$finish_item = new Record();
+			$finish_item->player = $player;
+			$finish_item->new = false;
+			$finish_item->score = $rtime;
+			$finish_item->pos = 0;
+			
+			ldb_playerFinish($aseco, $finish_item);
 		}
-	} else {
-		return;
 	}
+}
 
-	$finish_item = new Record();
-	$finish_item->player = $player;
-	$finish_item->new = false;
-	$finish_item->score = $rtime;
-	$finish_item->pos = 0;
+// called @ onPlayerFinish
+function ldb_playerFinish($aseco, $finish_item) {
+	global $ldb_records, $ldb_settings,
+	       $checkpoints;  // from plugin.checkpoints.php
 	
 	// if no actual finish, bail out immediately
 	if ($finish_item->score == 0) return;
