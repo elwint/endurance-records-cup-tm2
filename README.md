@@ -56,6 +56,8 @@ You can change the points in `plugin.localdatabase_enduro.php`
 
 /setrounds [Set the amount of endurance rounds (default: 3)]
 
+/setmaps [Set the amount of endurance maps (default: 1)]
+
 /resetpoints [Reset total points]
 
 /switch [Switch to another script]

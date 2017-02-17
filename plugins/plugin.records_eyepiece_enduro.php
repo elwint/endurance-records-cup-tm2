@@ -1,9 +1,9 @@
 <?php
 
-global $re_config, $re_scores, $re_cache, $enduscore, $reloc, $rounds, $roundsdone, $enduro, $enduro_normal, $enduro_points, $enduro_points_last;
+global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $enduro_points, $enduro_points_last;
 
-$enduro_points = array(15,12,10,8,6,5,4,3,2,1); // Rounds points array
-$enduro_points_last = 0; // Points given to finished players outside the array
+// $enduro_points = array(15,12,10,8,6,5,4,3,2,1); // Rounds points array
+// $enduro_points_last = 0; // Points given to finished players outside the array
 
 /*
  * Plugin: Records Eyepiece
@@ -224,6 +224,7 @@ Aseco::addChatCommand('estat',				'Display one of the MoreRankingLists (see: /ey
 Aseco::addChatCommand('eyeset',				'Adjust some settings for the Records-Eyepiece plugin (see: /eyepiece)', true);
 
 Aseco::addChatCommand('setrounds', 'Set the amount of endurance rounds (default: 3)');
+Aseco::addChatCommand('setmaps', 'Set the amount of endurance maps (default: 1)');
 Aseco::addChatCommand('resetpoints', 'Reset total points');
 Aseco::addChatCommand('switch', 'Switch to another script');
 
@@ -233,10 +234,11 @@ Aseco::addChatCommand('switch', 'Switch to another script');
 #///////////////////////////////////////////////////////////////////////#
 */
 
-$reloc = true;
 $enduscore = array();
 $rounds = 3;
+$maps = 1;
 $roundsdone = 0;
+$mapsdone = 0;
 $enduro = false;
 $enduro_normal = false;
 
@@ -2727,11 +2729,7 @@ function re_toggleWidgets ($aseco, $command) {
 
 function re_onEverySecond ($aseco) {
 
-	global $re_config, $re_scores, $re_cache, $reloc;
-
-	if ($reloc == false) {
-		return;
-	}
+	global $re_config, $re_scores, $re_cache;
 
 	// Is it time for refresh the RecordWidgets?
 	if (time() >= $re_config['States']['RefreshTimestampRecordWidgets']) {
@@ -2808,8 +2806,6 @@ function re_onEverySecond ($aseco) {
 		}
 		unset($player);
 	}
-$reloc = false;
-
 }
 
 /*
@@ -4360,7 +4356,7 @@ function re_onGerymaniaRecord ($aseco, $record) {
 
 // Event from plugin.localdatabase_enduro.php
 function re_onLocalRecord ($aseco, $finish_item) {
-	global $re_config, $re_scores, $re_cache, $reloc;
+	global $re_config, $re_scores, $re_cache;
 
 
 	// Check if the Player has already a LocalRecord, if not, only then increase MostRecords
@@ -4493,9 +4489,6 @@ function re_onLocalRecord ($aseco, $finish_item) {
 	if ($re_config['SCORETABLE_LISTS'][0]['TOP_AVERAGE_TIMES'][0]['ENABLED'][0] == true) {
 		$re_scores['TopAverageTimes'][$player->login][] = $finish_item->score;
 	}
-
-$reloc = true;
-
 
 
 }
@@ -4869,10 +4862,10 @@ function re_onStatusChangeTo6 ($aseco, $call) {
 */
 
 function re_onBeginRound ($aseco) {
-	global $re_config, $re_scores, $roundsdone, $rounds, $enduro;
+	global $re_config, $re_scores, $roundsdone, $rounds, $maps, $mapsdone, $enduro;
 	
 	if ($enduro) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ' . ($roundsdone+1) . '/' . $rounds));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ' . ($roundsdone+1) . '/' . $rounds . ' on map '  . ($mapsdone+1) . '/' . $maps));
 	}
 
 	// Init
@@ -4919,58 +4912,86 @@ function re_onBeginRound ($aseco) {
 */
 
 function re_onEndRound ($aseco) {
-	global $re_config, $re_cache, $rounds, $roundsdone, $enduro, $enduro_points, $enduro_points_last;
+	global $re_config, $re_cache, $rounds, $roundsdone, $maps, $mapsdone, $enduro, $enduro_points, $enduro_points_last;
 
-if ($enduro) {
-	
-	$aseco->client->query('GetCurrentRanking', 200, 0);
-	$race = $aseco->client->getResponse();
-
-	$e = 0;
-	for ($i=0; $i < count($race); $i++) {
-		if (isset($aseco->server->players->player_list[$race[$i]['Login']])) {
-			$player = $aseco->server->players->player_list[$race[$i]['Login']];
-			if ($player->isspectator == 0) {
-				if (isset($enduro_points[$e])) {
-					addPoints($player, $enduro_points[$e]);
-					$e++;
+	if ($enduro) {
+		$aseco->client->query('GetModeScriptVariables');
+		$vars = $aseco->client->getResponse();
+		$scores = array_filter(explode(",", $vars["enduro_scores"]));
+		$first = true;
+		foreach ($scores as &$score) {
+			$pscore = explode(":",$score);
+			if (isset($aseco->server->players->player_list[$pscore[0]])) {
+				$player = $aseco->server->players->player_list[$pscore[0]];
+				if ($first) {
+					addPoints($player, (int)$pscore[1] + 5);
+					$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . ((int)$pscore[1] + 5) . ' points (5 extra points for 1st place!)'), $player->login);
+					$first = false;
 				} else {
-					if ($enduro_points_last == 0) {
-						break;
-					} else {
-						addPoints($player, $enduro_points_last);
-					}
+					addPoints($player, $pscore[1]);
+					$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $pscore[1] . ' points'), $player->login);
 				}
 			}
 		}
-	}
+		
+		// $aseco->client->query('GetCurrentRanking', 200, 0);
+		// $race = $aseco->client->getResponse();
 
-	getPoints();
-	$re_config['States']['LiveRankings']['NeedUpdate']	= true;
-	$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
-	// Force the refresh
-	$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
-	re_buildRecordWidgets();
+		// $e = 0;
+		// for ($i=0; $i < count($race); $i++) {
+			// if (isset($aseco->server->players->player_list[$race[$i]['Login']])) {
+				// $player = $aseco->server->players->player_list[$race[$i]['Login']];
+				// if ($player->isspectator == 0) {
+					// if (isset($enduro_points[$e])) {
+						// addPoints($player, $enduro_points[$e]);
+						// $aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $enduro_points[$e] . ' points'), $player->login);
+						// $e++;
+					// } else {
+						// if ($enduro_points_last == 0) {
+							// break;
+						// } else {
+							// addPoints($player, $enduro_points_last);
+							// $aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $enduro_points_last . ' points.'), $player->login);
+						// }
+					// }
+				// }
+			// }
+		// }
 
-	$roundsdone++;
-	if ($roundsdone < $rounds) {
-		$aseco->client->query('RestartMap');
-	}
-	
-} else {
-	// Get current Gamemode
-	$gamemode = $aseco->server->gameinfo->mode;
-
-	// At Gamemode 'Rounds', 'Team' or 'Cup' need to refresh now
-	if ( ($gamemode == Gameinfo::RNDS) || ($gamemode == Gameinfo::TEAM) || ($gamemode == Gameinfo::CUP) ) {
+		getPoints();
 		$re_config['States']['LiveRankings']['NeedUpdate']	= true;
 		$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
-
 		// Force the refresh
 		$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
-	}
 
-}
+		$roundsdone++;
+		if ($roundsdone < $rounds) {
+			$aseco->client->query('RestartMap');
+		} else {
+			$mapsdone++;
+			if ($mapsdone >= $maps) {
+				$mapsdone = 0;
+				re_buildRecordWidgets();
+				re_sendManialink(re_buildLiveRankingsWindow(0), false, 0);
+				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEnd of the cup, thanks for playing!'));
+			} else {
+				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zNext: map ' . ($mapsdone+1) . '/' . $maps));
+			}
+		}
+		
+	} else {
+		// Get current Gamemode
+		$gamemode = $aseco->server->gameinfo->mode;
+
+		// At Gamemode 'Rounds', 'Team' or 'Cup' need to refresh now
+		if ( ($gamemode == Gameinfo::RNDS) || ($gamemode == Gameinfo::TEAM) || ($gamemode == Gameinfo::CUP) ) {
+			$re_config['States']['LiveRankings']['NeedUpdate']	= true;
+			$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
+
+			// Force the refresh
+			$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
+		}
+	}
 }
 
 function getPoints() {
@@ -5041,13 +5062,13 @@ function re_onBeginMap ($aseco, $map_item) {
 	
 	$aseco->client->query('GetScriptName');
 	$dat = $aseco->client->getResponse();
-	if (mb_strtolower($dat['CurrentValue']) == 'endurancecup.script.txt') {
+	if (strpos(mb_strtolower($dat['CurrentValue']), 'endurancecup.script.txt') !== false) {
 		$enduro = true;
 	} else {
 		$enduro = false;
 	}
 	
-	if (mb_strtolower($dat['CurrentValue']) == 'endurance.script.txt') {
+	if (strpos(mb_strtolower($dat['CurrentValue']), 'endurance.script.txt') !== false) {
 		$enduro_normal = true;
 	} else {
 		$enduro_normal = false;
@@ -16467,7 +16488,7 @@ function re_loadTemplates () {
 	$header .= '<label posn="2.33 -2.4 0.03" sizen="6 0" halign="center" valign="center" textsize="3" textcolor="000F" text="$O-"/>';
 	$header .= '</frame>';
 
-	$header .= '<label posn="6.8 -55.8 0.04" sizen="16 2" halign="center" valign="center" textsize="1" scale="0.7" action="'. $re_config['ManialinkId'] .'157" focusareacolor1="0000" focusareacolor2="FFF5" textcolor="000F" text="RECORDS-EYEPIECE/'. $re_config['Version'] .' (Modified by Virtex)"/>';
+	$header .= '<label posn="12.8 -55.8 0.04" sizen="32 2" halign="center" valign="center" textsize="1" scale="0.7" action="'. $re_config['ManialinkId'] .'157" focusareacolor1="0000" focusareacolor2="FFF5" textcolor="000F" text="RECORDS-EYEPIECE/'. $re_config['Version'] .'; Endurance script by TGYoshi/Tiggs. (Modified by Virtex)"/>';
 	$header .= '%prev_next_buttons%';
 
 $maniascript = <<<EOL
@@ -17671,6 +17692,29 @@ function chat_setrounds($aseco, $command) {
     $aseco->console('Endurance rounds set to: ' . $rounds);
 }
 
+function chat_setmaps($aseco, $command) {
+	global $maps;
+	
+	$admin = $command['author'];
+	$login = $admin->login;
+		
+    if (!$aseco->isMasterAdmin($command['author'])) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+        return;
+	}
+
+	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
+	if (isset($command['params'][0])) {
+		$maps = (int)$command['params'][0];
+	}
+	
+	if ($maps <= 1) {
+		$maps = 1;
+	}
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance maps set to: ' . $maps));
+    $aseco->console('Endurance maps set to: ' . $maps);
+}
+
 function chat_switch($aseco, $command) {
 	global $enduro;
 	
@@ -17690,7 +17734,7 @@ function chat_switch($aseco, $command) {
 	
 	$aseco->client->query('GetScriptName');
 	$dat = $aseco->client->getResponse();
-	if (mb_strtolower($dat['CurrentValue']) == mb_strtolower($command['params'][0]) . '.script.txt') {
+	if (strpos(mb_strtolower($dat['CurrentValue']), mb_strtolower($command['params'][0]) . '.script.txt') !== false) {
 		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Can\'t switch to the same script!'), $login);
         return;
 	}
@@ -17699,6 +17743,8 @@ function chat_switch($aseco, $command) {
 	$aseco->console('Switching to ' . $command['params'][0]);
 	if ($enduro) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints frozen'));
+	} else if (strpos(mb_strtolower($command['params'][0]) . '.script.txt', 'endurancecup.script.txt') !== false) {
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: amount of CP\'s {1st place: +5 extra points}'));
 	}
 	
 	$aseco->client->query('SetScriptName', $command['params'][0]);
@@ -17721,7 +17767,6 @@ function chat_resetpoints($aseco, $command) {
 	$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
 	// Force the refresh
 	$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
-	re_buildRecordWidgets();
 	
 	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points has been reset'));
 }
