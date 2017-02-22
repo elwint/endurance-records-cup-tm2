@@ -1,12 +1,7 @@
 <?php
 
-global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $enduro_points, $enduro_points_last;
-
-// $enduro_points = array(15,12,10,8,6,5,4,3,2,1); // Rounds points array
-// $enduro_points_last = 0; // Points given to finished players outside the array
-
 /*
- * Plugin: Records Eyepiece
+ * Plugin: Records Eyepiece (EnduranceCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
  * For a detailed description and documentation, please refer to:
  * http://www.undef.name/XAseco2/Records-Eyepiece.php
@@ -19,7 +14,7 @@ global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdon
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by Virtex (fsxelw) (EnduranceCup)
+ * Modified by: Virtex (fsxelw) (EnduranceCup) (02-2017)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -199,6 +194,7 @@ Aseco::registerEvent('onPlayerConnect',			're_onPlayerConnect');
 Aseco::registerEvent('onPlayerConnect2',		're_onPlayerConnect2');
 Aseco::registerEvent('onPlayerDisconnect',		're_onPlayerDisconnect');
 Aseco::registerEvent('onPlayerInfoChanged',		're_onPlayerInfoChanged');
+Aseco::registerEvent('onCheckpoint',			're_onCheckpoint');
 Aseco::registerEvent('onPlayerFinish1',			're_onPlayerFinish1');
 Aseco::registerEvent('onPlayerWins',			're_onPlayerWins');
 Aseco::registerEvent('onPlayerManialinkPageAnswer',	're_onPlayerManialinkPageAnswer');
@@ -234,7 +230,10 @@ Aseco::addChatCommand('switch', 'Switch to another script');
 #///////////////////////////////////////////////////////////////////////#
 */
 
+global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $ptime, $lastcptime;
 $enduscore = array();
+$ptime = array();
+$lastcptime = array();
 $rounds = 3;
 $maps = 1;
 $roundsdone = 0;
@@ -254,21 +253,21 @@ function re_onSync ($aseco, $reload = null) {
 			XASECO2_VERSION
 		);
 		if ( version_compare($version, $xaseco2_min_version, '<') ) {
-			trigger_error('[plugin.records_eyepiece.php] Not supported XAseco2 version ('. $version .')! Please update to min. version '. $xaseco2_min_version .'!', E_USER_ERROR);
+			trigger_error('[plugin.records_eyepiece_enduro.php] Not supported XAseco2 version ('. $version .')! Please update to min. version '. $xaseco2_min_version .'!', E_USER_ERROR);
 		}
 	}
 	else {
-		trigger_error('[plugin.records_eyepiece.php] Can not identify the System, "XASECO2_VERSION" is unset! This plugin runs only with XAseco2/'. $xaseco2_min_version .'+', E_USER_ERROR);
+		trigger_error('[plugin.records_eyepiece_enduro.php] Can not identify the System, "XASECO2_VERSION" is unset! This plugin runs only with XAseco2/'. $xaseco2_min_version .'+', E_USER_ERROR);
 	}
 
 	if ($aseco->server->getGame() != 'MP') {
-		trigger_error('[plugin.records_eyepiece.php] This plugin supports only TM2 (ManiaPlanet), can not start with a "'. $aseco->server->getGame() .'" Dedicated-Server!', E_USER_ERROR);
+		trigger_error('[plugin.records_eyepiece_enduro.php] This plugin supports only TM2 (ManiaPlanet), can not start with a "'. $aseco->server->getGame() .'" Dedicated-Server!', E_USER_ERROR);
 	}
 
 
 	// Read Configuration
 	if (!$re_config = $aseco->xml_parser->parseXML('records_eyepiece_enduro.xml', true, true)) {
-		trigger_error('[plugin.records_eyepiece.php] Could not read/parse config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not read/parse config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
 	$re_config = $re_config['RECORDS_EYEPIECE'];
 
@@ -280,13 +279,21 @@ function re_onSync ($aseco, $reload = null) {
 
 	// Register this to the global version pool (for up-to-date checks)
 	$aseco->plugin_versions[] = array(
-		'plugin'	=> 'plugin.records_eyepiece.php',
+		'plugin'	=> 'plugin.records_eyepiece_enduro.php',
 		'author'	=> 'undef.de',
 		'version'	=> $re_config['Version']
 	);
 
 	if ( !isset($re_config['MUSIC_WIDGET'][0]['ADVERTISE'][0]) ) {
 		$re_config['MUSIC_WIDGET'][0]['ADVERTISE'][0] = 'true';
+	}
+	
+	// Check EnduranceCup Settings
+	if ( (!isset($re_config['ENDURANCE_CUP'][0]['POINTS'][0])) || ($re_config['ENDURANCE_CUP'][0]['POINTS'][0] == '') ) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+	}
+	if (!isset($re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0])) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points_last" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
 
 	// Transform 'TRUE' or 'FALSE' from string to boolean
@@ -399,7 +406,7 @@ function re_onSync ($aseco, $reload = null) {
 		if ( (preg_match('/\{score\}/', $format) === 0) && ((preg_match('/\{remaining\}/', $format) === 0) || (preg_match('/\{pointlimit\}/', $format) === 0)) ) {
 			// Setup default
 			$re_config['LIVE_RANKINGS'][0]['GAMEMODE'][0]['ROUNDS'][0]['FORMAT'][0] = '{score} ({remaining})';
-			$aseco->console('[plugin.records_eyepiece.php] LiveRankingsWidget placeholder not (complete) found, setup default format: "{score} ({remaining})"');
+			$aseco->console('[plugin.records_eyepiece_enduro.php] LiveRankingsWidget placeholder not (complete) found, setup default format: "{score} ({remaining})"');
 		}
 	}
 
@@ -475,7 +482,7 @@ function re_onSync ($aseco, $reload = null) {
 		$dependency['RaspRank'] = true;
 	}
 	$required = array(
-		'plugin.localdatabase_enduro.php'	=> array('status' => true, 'position' => 0),
+		'plugin.localdatabase.php'	=> array('status' => true, 'position' => 0),
 	);
 	foreach ($required as $plugin => &$state) {
 		if ($state['status'] == false) {
@@ -489,7 +496,7 @@ function re_onSync ($aseco, $reload = null) {
 			}
 			$state['position'] ++;			// Count the Plugin position for next check below
 		}
-		trigger_error('[plugin.records_eyepiece.php] Unmet requirements! With your current configuration you need to activate "'. $plugin .'" in your "plugins.xml" to run this Plugin!', E_USER_ERROR);
+		trigger_error('[plugin.records_eyepiece_enduro.php] Unmet requirements! With your current configuration you need to activate "'. $plugin .'" in your "plugins.xml" to run this Plugin!', E_USER_ERROR);
 	}
 	unset($state, $installed_plugin);
 
@@ -501,7 +508,7 @@ function re_onSync ($aseco, $reload = null) {
 	// Check the right order of the required Plugins, this Plugin has to be behind after all other required Plugins in plugins.xml
 	$eyepiece_position = 0;
 	foreach ($aseco->plugins as &$plugin) {
-		if ($plugin == 'plugin.records_eyepiece.php') {
+		if ($plugin == 'plugin.records_eyepiece_enduro.php') {
 			break;
 		}
 		$eyepiece_position ++;
@@ -513,7 +520,7 @@ function re_onSync ($aseco, $reload = null) {
 			continue;
 		}
 		if ($state['position'] > $eyepiece_position) {
-			trigger_error('[plugin.records_eyepiece.php] This Plugin must placed behind "'. $plugin .'", otherwise you can see mysterious results!', E_USER_ERROR);
+			trigger_error('[plugin.records_eyepiece_enduro.php] This Plugin must placed behind "'. $plugin .'", otherwise you can see mysterious results!', E_USER_ERROR);
 		}
 	}
 	unset($plugin, $state, $required, $eyepiece_position);
@@ -537,7 +544,7 @@ function re_onSync ($aseco, $reload = null) {
 		foreach ($aseco->plugins as &$installed_plugin) {
 			if ($plugin == $installed_plugin) {
 				// Found, trigger error
-				trigger_error('[plugin.records_eyepiece.php] This Plugin can not run with "'. $plugin .'" together, you have to remove "'. $plugin .'" from plugins.xml or deactivate the related Widget in records_eyepiece_enduro.xml!', E_USER_ERROR);
+				trigger_error('[plugin.records_eyepiece_enduro.php] This Plugin can not run with "'. $plugin .'" together, you have to remove "'. $plugin .'" from plugins.xml or deactivate the related Widget in records_eyepiece_enduro.xml!', E_USER_ERROR);
 			}
 		}
 	}
@@ -663,7 +670,7 @@ function re_onSync ($aseco, $reload = null) {
 		$message = str_replace('{br}', "%0A", $message);  // split long message
 		$message = $aseco->formatColors($message);
 		if (strlen($message) >= 256) {
-			trigger_error('[plugin.records_eyepiece.php] The <messages><winning_mail_body> is '. strlen($message) .' signs long (incl. the replaced placeholder), please remove '. (strlen($message) - 256) .' signs to fit into 256 signs limit!', E_USER_ERROR);
+			trigger_error('[plugin.records_eyepiece_enduro.php] The <messages><winning_mail_body> is '. strlen($message) .' signs long (incl. the replaced placeholder), please remove '. (strlen($message) - 256) .' signs to fit into 256 signs limit!', E_USER_ERROR);
 		}
 	}
 
@@ -1600,7 +1607,7 @@ function re_onSync ($aseco, $reload = null) {
 
 
 	if ($reload === null) {
-		$aseco->console('**********[plugin.records_eyepiece.php/'. $re_config['Version'] .'-'. $aseco->server->getGame() .']**********');
+		$aseco->console('**********[plugin.records_eyepiece_enduro.php/'. $re_config['Version'] .'-'. $aseco->server->getGame() .']**********');
 		$aseco->console('>> Checking Database for required extensions...');
 
 		// Check the Database-Table for existing `Timezone`, `DisplayWidgets` and `MostFinished` column
@@ -1617,7 +1624,7 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `Timezone` column if not yet done
 		if ( !in_array('Timezone', $fields) ) {
 			$aseco->console('   + Adding column `Timezone` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `Timezone` VARCHAR(64) CHARACTER SET utf8 COLLATE utf8_bin NULL DEFAULT NULL COMMENT "Added by plugin.records_eyepiece.php";');
+			mysql_query('ALTER TABLE `players_extra` ADD `Timezone` VARCHAR(64) CHARACTER SET utf8 COLLATE utf8_bin NULL DEFAULT NULL COMMENT "Added by plugin.records_eyepiece_enduro.php";');
 		}
 		else {
 			$aseco->console('   + Found column `Timezone` at table `players_extra`.');
@@ -1626,7 +1633,7 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `DisplayWidgets` column if not yet done
 		if ( !in_array('DisplayWidgets', $fields) ) {
 			$aseco->console('   + Adding column `DisplayWidgets` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `DisplayWidgets` ENUM("true", "false") CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT "true" COMMENT "Added by plugin.records_eyepiece.php" AFTER `Timezone`;');
+			mysql_query('ALTER TABLE `players_extra` ADD `DisplayWidgets` ENUM("true", "false") CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT "true" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `Timezone`;');
 		}
 		else {
 			$aseco->console('   + Found column `DisplayWidgets` at table `players_extra`.');
@@ -1635,18 +1642,18 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `MostFinished` column if not yet done
 		if ( !in_array('MostFinished', $fields) ) {
 			$aseco->console('   + Adding column `MostFinished` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `MostFinished` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php" AFTER `DisplayWidgets`, ADD INDEX (`MostFinished`);');
+			mysql_query('ALTER TABLE `players_extra` ADD `MostFinished` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `DisplayWidgets`, ADD INDEX (`MostFinished`);');
 		}
 		else {
 			// Fix the unset DEFAULT VALUE
-			mysql_query('ALTER TABLE `players_extra` CHANGE `MostFinished` `MostFinished` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php";');
+			mysql_query('ALTER TABLE `players_extra` CHANGE `MostFinished` `MostFinished` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php";');
 			$aseco->console('   + Found column `MostFinished` at table `players_extra`.');
 		}
 
 		// Add `MostRecords` column if not yet done
 		if ( !in_array('MostRecords', $fields) ) {
 			$aseco->console('   + Adding column `MostRecords` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `MostRecords` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php" AFTER `MostFinished`, ADD INDEX (`MostRecords`);');
+			mysql_query('ALTER TABLE `players_extra` ADD `MostRecords` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `MostFinished`, ADD INDEX (`MostRecords`);');
 		}
 		else {
 			$aseco->console('   + Found column `MostRecords` at table `players_extra`.');
@@ -1655,7 +1662,7 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `RoundPoints` column if not yet done
 		if ( !in_array('RoundPoints', $fields) ) {
 			$aseco->console('   + Adding column `RoundPoints` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `RoundPoints` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php" AFTER `MostRecords`, ADD INDEX (`RoundPoints`);');
+			mysql_query('ALTER TABLE `players_extra` ADD `RoundPoints` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `MostRecords`, ADD INDEX (`RoundPoints`);');
 		}
 		else {
 			$aseco->console('   + Found column `RoundPoints` at table `players_extra`.');
@@ -1664,7 +1671,7 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `TeamPoints` column if not yet done
 		if ( !in_array('TeamPoints', $fields) ) {
 			$aseco->console('   + Adding column `TeamPoints` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `TeamPoints` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php" AFTER `RoundPoints`, ADD INDEX (`TeamPoints`);');
+			mysql_query('ALTER TABLE `players_extra` ADD `TeamPoints` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `RoundPoints`, ADD INDEX (`TeamPoints`);');
 		}
 		else {
 			$aseco->console('   + Found column `TeamPoints` at table `players_extra`.');
@@ -1673,7 +1680,7 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `Visits` column if not yet done
 		if ( !in_array('Visits', $fields) ) {
 			$aseco->console('   + Adding column `Visits` at table `players_extra`...');
-			mysql_query('ALTER TABLE `players_extra` ADD `Visits` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php" AFTER `TeamPoints`, ADD INDEX (`Visits`);');
+			mysql_query('ALTER TABLE `players_extra` ADD `Visits` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `TeamPoints`, ADD INDEX (`Visits`);');
 		}
 		else {
 			$aseco->console('   + Found column `Visits` at table `players_extra`.');
@@ -1682,7 +1689,7 @@ function re_onSync ($aseco, $reload = null) {
 		// Add `WinningPayout` column if not yet done
 		if ( !in_array('WinningPayout', $fields) ) {
 			$aseco->console('   + Adding column `WinningPayout` at table `players_extra`.');
-			mysql_query('ALTER TABLE `players_extra` ADD `WinningPayout` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece.php" AFTER `Visits`, ADD INDEX (`WinningPayout`);');
+			mysql_query('ALTER TABLE `players_extra` ADD `WinningPayout` MEDIUMINT(3) UNSIGNED NOT NULL DEFAULT "0" COMMENT "Added by plugin.records_eyepiece_enduro.php" AFTER `Visits`, ADD INDEX (`WinningPayout`);');
 		}
 		else {
 			$aseco->console('   + Found column `WinningPayout` at table `players_extra`.');
@@ -1840,12 +1847,12 @@ function re_onSync ($aseco, $reload = null) {
 					// WITH <include>: Check for min. required entries <display>, <include>,
 					// skip if one was not found.
 					if ( !isset($placement['DISPLAY'][0]) ) {
-						$aseco->console('[plugin.records_eyepiece.php] One of your <placement> did not have all min. required entries, missing <display>!');
+						$aseco->console('[plugin.records_eyepiece_enduro.php] One of your <placement> did not have all min. required entries, missing <display>!');
 						continue;
 					}
 
 					if ( !is_readable($placement['INCLUDE'][0]) ) {
-						$aseco->console('[plugin.records_eyepiece.php] One of your <placement> are unable to display, because the file "'. $placement['INCLUDE'][0] .'" at <include> could not be accessed!');
+						$aseco->console('[plugin.records_eyepiece_enduro.php] One of your <placement> are unable to display, because the file "'. $placement['INCLUDE'][0] .'" at <include> could not be accessed!');
 						continue;
 					}
 				}
@@ -1853,7 +1860,7 @@ function re_onSync ($aseco, $reload = null) {
 					// WITHOUT <include>: Check for min. required entries <pos_x>, <pos_y>, <width> and <height>,
 					// skip if one was not found.
 					if ( ( !isset($placement['DISPLAY'][0]) ) || ( !isset($placement['POS_X'][0]) ) || ( !isset($placement['POS_Y'][0]) ) || ( !isset($placement['WIDTH'][0]) ) || ( !isset($placement['HEIGHT'][0]) ) ) {
-						$aseco->console('[plugin.records_eyepiece.php] One of your <placement> did not have all min. required entries, missing one of <pos_x>, <pos_y>, <width> or <height>!');
+						$aseco->console('[plugin.records_eyepiece_enduro.php] One of your <placement> did not have all min. required entries, missing one of <pos_x>, <pos_y>, <width> or <height>!');
 						continue;
 					}
 				}
@@ -2066,7 +2073,7 @@ function re_onSync ($aseco, $reload = null) {
 	if ($re_config['DONATION_WIDGET'][0]['ENABLED'][0] == true) {
 		$val = explode(',', $re_config['DONATION_WIDGET'][0]['AMOUNTS'][0]);
 		if (count($val) < 7) {
-			trigger_error('[plugin.records_eyepiece.php] The amount of <donation_widget><amounts> is lower then the required min. of 7 in records_eyepiece_enduro.xml!', E_USER_ERROR);
+			trigger_error('[plugin.records_eyepiece_enduro.php] The amount of <donation_widget><amounts> is lower then the required min. of 7 in records_eyepiece_enduro.xml!', E_USER_ERROR);
 		}
 		$re_cache['DonationWidget']['Default'] = re_buildDonationWidget('DEFAULT');
 		$re_cache['DonationWidget']['Loading'] = re_buildDonationWidget('LOADING');
@@ -2316,7 +2323,7 @@ function chat_eyeset ($aseco, $command) {
 	// Check optional parameter
 	if (strtoupper($command['params']) == 'RELOAD') {
 		if ($aseco->server->gamestate == Server::RACE) {
-			$aseco->console('[plugin.records_eyepiece.php] MasterAdmin '. $command['author']->login .' reloads the configuration.');
+			$aseco->console('[plugin.records_eyepiece_enduro.php] MasterAdmin '. $command['author']->login .' reloads the configuration.');
 
 			// Close all Widgets at all Players
 			$xml  = re_closeRaceDisplays(false, true);
@@ -2995,7 +3002,7 @@ function re_onPlayerConnect ($aseco, $player) {
 		$query = "UPDATE `players_extra` SET `Visits`=`Visits`+1 WHERE `PlayerId`='". $player->id ."' LIMIT 1;";
 		$result = mysql_query($query);
 		if (!$result) {
-			$aseco->console('[plugin.records_eyepiece.php] UPDATE `Visits` at `players_extra` failed. [for statement "'. $query .'"]!');
+			$aseco->console('[plugin.records_eyepiece_enduro.php] UPDATE `Visits` at `players_extra` failed. [for statement "'. $query .'"]!');
 		}
 	}
 
@@ -3395,7 +3402,7 @@ function re_onPlayerFinish1 ($aseco, $finish_item) {
 	$query = "UPDATE `players_extra` SET `MostFinished`=`MostFinished`+1 WHERE `PlayerId`='". $player->id ."';";
 	$result = mysql_query($query);
 	if (!$result) {
-		$aseco->console('[plugin.records_eyepiece.php] UPDATE `MostFinished` at `players_extra` failed. [for statement "'. $query .'"]!');
+		$aseco->console('[plugin.records_eyepiece_enduro.php] UPDATE `MostFinished` at `players_extra` failed. [for statement "'. $query .'"]!');
 	}
 
 
@@ -4354,7 +4361,7 @@ function re_onGerymaniaRecord ($aseco, $record) {
 #///////////////////////////////////////////////////////////////////////#
 */
 
-// Event from plugin.localdatabase_enduro.php
+// Event from plugin.localdatabase.php
 function re_onLocalRecord ($aseco, $finish_item) {
 	global $re_config, $re_scores, $re_cache;
 
@@ -4377,7 +4384,7 @@ function re_onLocalRecord ($aseco, $finish_item) {
 		$query = "UPDATE `players_extra` SET `MostRecords`=`MostRecords`+1 WHERE `PlayerId`='". $player->id ."';";
 		$result = mysql_query($query);
 		if (!$result) {
-			$aseco->console('[plugin.records_eyepiece.php] UPDATE `MostRecords` at `players_extra` failed. [for statement "'. $query .'"]!');
+			$aseco->console('[plugin.records_eyepiece_enduro.php] UPDATE `MostRecords` at `players_extra` failed. [for statement "'. $query .'"]!');
 		}
 
 		foreach ($re_scores['MostRecords'] as &$item) {
@@ -4455,7 +4462,7 @@ function re_onLocalRecord ($aseco, $finish_item) {
 	$query = "UPDATE `players_extra` SET `MostFinished`=`MostFinished`+1 WHERE `PlayerId`='". $player->id ."';";
 	$result = mysql_query($query);
 	if (!$result) {
-		$aseco->console('[plugin.records_eyepiece.php] UPDATE `MostFinished` at `players_extra` failed. [for statement "'. $query .'"]!');
+		$aseco->console('[plugin.records_eyepiece_enduro.php] UPDATE `MostFinished` at `players_extra` failed. [for statement "'. $query .'"]!');
 	}
 
 
@@ -4865,7 +4872,7 @@ function re_onBeginRound ($aseco) {
 	global $re_config, $re_scores, $roundsdone, $rounds, $maps, $mapsdone, $enduro;
 	
 	if ($enduro) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ' . ($roundsdone+1) . '/' . $rounds . ' on map '  . ($mapsdone+1) . '/' . $maps));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ' . ($roundsdone+1) . '/' . $rounds . ' on map '  . ($mapsdone+1) . '/' . $maps . '.'));
 	}
 
 	// Init
@@ -4912,51 +4919,67 @@ function re_onBeginRound ($aseco) {
 */
 
 function re_onEndRound ($aseco) {
-	global $re_config, $re_cache, $rounds, $roundsdone, $maps, $mapsdone, $enduro, $enduro_points, $enduro_points_last;
+	global $re_config, $re_cache, $rounds, $roundsdone, $maps, $mapsdone, $enduro, $lastcptime;
 
-	if ($enduro) {
+	if ($enduro) {	
+		$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
+		
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
 		$scores = array_filter(explode(",", $vars["enduro_scores"]));
-		$first = true;
+		
+		// Get players data (CP's already sorted)
+		$finished_players = array();
 		foreach ($scores as &$score) {
-			$pscore = explode(":",$score);
-			if (isset($aseco->server->players->player_list[$pscore[0]])) {
-				$player = $aseco->server->players->player_list[$pscore[0]];
-				if ($first) {
-					addPoints($player, (int)$pscore[1] + 5);
-					$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . ((int)$pscore[1] + 5) . ' points (5 extra points for 1st place!)'), $player->login);
-					$first = false;
-				} else {
-					addPoints($player, $pscore[1]);
-					$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $pscore[1] . ' points'), $player->login);
+			$cpscore = explode(":",$score);
+			if (isset($aseco->server->players->player_list[$cpscore[0]])) {
+				$player = $aseco->server->players->player_list[$cpscore[0]];
+				if ($player->isspectator == 0) {
+					if (!isset($lastcptime[$player->id])) {
+						$lastcptime[$player->id] = 0;
+					}
+					$finished_players[(int)$cpscore[1]][$player->login] = $lastcptime[$player->id];
 				}
 			}
 		}
 		
-		// $aseco->client->query('GetCurrentRanking', 200, 0);
-		// $race = $aseco->client->getResponse();
-
-		// $e = 0;
-		// for ($i=0; $i < count($race); $i++) {
-			// if (isset($aseco->server->players->player_list[$race[$i]['Login']])) {
-				// $player = $aseco->server->players->player_list[$race[$i]['Login']];
-				// if ($player->isspectator == 0) {
-					// if (isset($enduro_points[$e])) {
-						// addPoints($player, $enduro_points[$e]);
-						// $aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $enduro_points[$e] . ' points'), $player->login);
-						// $e++;
-					// } else {
-						// if ($enduro_points_last == 0) {
-							// break;
-						// } else {
-							// addPoints($player, $enduro_points_last);
-							// $aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $enduro_points_last . ' points.'), $player->login);
-						// }
-					// }
-				// }
-			// }
-		// }
+		// Sort on CP time and give points
+		$e = 0;
+		foreach ($finished_players as $cpn=>$cp) {
+			asort($cp);
+			// $aseco->console( $cpn );
+			// $aseco->console( var_dump($cp) );
+			foreach ($cp as $player_login=>$cptime) {
+				if ($e == 0 && $cpn > 0) {
+					$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ended after $FFF' . re_formatTime($cptime) . '$z.'));
+				}
+				$player = $aseco->server->players->player_list[$player_login];
+				$msg = '$z$s$FF0> [$F00INFO$FF0] $zKicked out at $FFF'. ordinal($e+1) .'$z place.';
+				if ($cpn > 0) {
+					$msg = $msg.' CP: $FFF' . $cpn . '$z (';
+					$pos = 1;
+					foreach ($cp as $s_player_login=>$s_cptime) {
+						// $msg = $msg.$pos.'. '.$aseco->server->players->player_list[$s_player_login]->nickname.'$z ('.re_formatTime($s_cptime).'); ';
+						if ($s_player_login == $player_login)
+							break;
+						$pos++;
+					}
+					$msg = $msg.ordinal($pos) .').';
+				}
+				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors($msg), $player->login);
+				if (isset($enduro_points[$e])) {
+					$points = (int)$enduro_points[$e];
+					$e++;
+				} else {
+					if ((int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] == 0)
+						break;
+					else
+						$points = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
+				}
+				addPoints($player, $points);
+				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $points . ' points.'), $player->login);
+			}
+		}
 
 		getPoints();
 		$re_config['States']['LiveRankings']['NeedUpdate']	= true;
@@ -4965,6 +4988,7 @@ function re_onEndRound ($aseco) {
 		$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
 
 		$roundsdone++;
+		sleep(2); // EndRound sequence (if server lagg reduce this number)
 		if ($roundsdone < $rounds) {
 			$aseco->client->query('RestartMap');
 		} else {
@@ -4973,9 +4997,8 @@ function re_onEndRound ($aseco) {
 				$mapsdone = 0;
 				re_buildRecordWidgets();
 				re_sendManialink(re_buildLiveRankingsWindow(0), false, 0);
-				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEnd of the cup, thanks for playing!'));
 			} else {
-				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zNext: map ' . ($mapsdone+1) . '/' . $maps));
+				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zNext: map ' . ($mapsdone+1) . '/' . $maps . '.'));
 			}
 		}
 		
@@ -4992,6 +5015,14 @@ function re_onEndRound ($aseco) {
 			$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
 		}
 	}
+}
+
+function ordinal($number) {
+    $ends = array('th','st','nd','rd','th','th','th','th','th','th');
+    if ((($number % 100) >= 11) && (($number%100) <= 13))
+        return $number. 'th';
+    else
+        return $number. $ends[$number % 10];
 }
 
 function getPoints() {
@@ -5020,8 +5051,6 @@ function getPoints() {
 }
 
 function addPoints($player, $points) {
-	global $enduscore;
-
 	$query = 'UPDATE players_extra
 			  SET RoundPoints = RoundPoints + ' . $points . '
 			  WHERE PlayerId=' . $player->id;
@@ -5058,7 +5087,7 @@ function resetPoints() {
 
 // $rounds_points is imported from plugin.rpoints.php
 function re_onBeginMap ($aseco, $map_item) {
-	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal;
+	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $map_cps;
 	
 	$aseco->client->query('GetScriptName');
 	$dat = $aseco->client->getResponse();
@@ -5079,6 +5108,10 @@ function re_onBeginMap ($aseco, $map_item) {
 	}
 	
 	getPoints();
+	
+	$aseco->client->query('GetCurrentMapInfo');
+	$cps = $aseco->client->getResponse();
+	$map_cps = $cps['NbCheckpoints'];
 
 	// Close the Scoretable-Lists at all Players
 	$widgets = re_closeScoretableLists(true);
@@ -5098,41 +5131,6 @@ function re_onBeginMap ($aseco, $map_item) {
 
 	// Get current Gamemode
 	$gamemode = $aseco->server->gameinfo->mode;
-
-
-	// Special handling for Gamemode 'Laps', but do not turn of if <checkpointcount_widget> is enabled!
-	if ( ($gamemode != Gameinfo::LAPS) && ( !empty($aseco->events['onCheckpoint'])) && ($re_config['CHECKPOINTCOUNT_WIDGET'][0]['ENABLED'][0] == false) ) {
-		// Unregister (possible registered) onCheckpoint event for Gamemode 'Laps' if this is not 'Laps'
-		$array_pos = 0;
-		foreach ($aseco->events['onCheckpoint'] as &$func_name) {
-			if ($func_name == 're_onCheckpoint') {
-				$aseco->console('[plugin.records_eyepiece.php] Unregister event "onCheckpoint", currently not required.');
-				unset($aseco->events['onCheckpoint'][$array_pos]);
-				break;
-			}
-			$array_pos ++;
-		}
-		unset($func_name);
-	}
-	else if ( ($re_config['LIVE_RANKINGS'][0]['GAMEMODE'][0][Gameinfo::LAPS][0]['ENABLED'][0] == true) || ($re_config['ROUND_SCORE'][0]['GAMEMODE'][0][Gameinfo::LAPS][0]['ENABLED'][0] == true) || ($re_config['CHECKPOINTCOUNT_WIDGET'][0]['ENABLED'][0] == true) ) {
-		// Register event onCheckpoint in Gamemode 'Laps'
-		// if <live_rankings><laps> is enabled
-		// or when <checkpointcount_widget> is enabled
-		// or when <round_score><gamemode><laps> is enabled
-		$found = false;
-		foreach ($aseco->events['onCheckpoint'] as &$func_name) {
-			if ($func_name == 're_onCheckpoint') {
-				$found = true;
-				break;
-			}
-
-		}
-		if ($found == false) {
-			$aseco->registerEvent('onCheckpoint', 're_onCheckpoint');
-			$aseco->console('[plugin.records_eyepiece.php] Register event "onCheckpoint" to enabled wanted Widgets.');
-		}
-	}
-
 
 	// Setup the no-score Placeholder depending at the current Gamemode
 	if ($gamemode == Gameinfo::STNT) {
@@ -5161,7 +5159,7 @@ function re_onBeginMap ($aseco, $map_item) {
 						$re_config['RoundScore']['Points'][Gameinfo::RNDS] = explode(',', $aseco->settings['default_rpoints']);
 					}
 					else {
-						$aseco->console('[plugin.records_eyepiece.php] Warning: <default_rpoints> in config.xml are set to an unknown Points set by plugin.rpoints.php and the format is wrong also (has to be e.g. "30,25,20,15,10" or "motogp5")!');
+						$aseco->console('[plugin.records_eyepiece_enduro.php] Warning: <default_rpoints> in config.xml are set to an unknown Points set by plugin.rpoints.php and the format is wrong also (has to be e.g. "30,25,20,15,10" or "motogp5")!');
 					}
 				}
 
@@ -5535,47 +5533,32 @@ function re_onBeginMap2 ($aseco, $map_item) {
 #///////////////////////////////////////////////////////////////////////#
 */
 
-// TM2: [0]=PlayerUid, [1]=Login, [2]=TimeOrScore, [3]=CurLap, [4]=CheckpointIndex
-// This event is only activated in Gamemode 'Laps'
-// if <live_rankings><laps> is enabled
-// or when <checkpointcount_widget> is enabled
-// or when <round_score><gamemode><laps> is enabled
-function re_onCheckpoint ($aseco, $checkpt) {
-	global $re_config, $re_scores;
-
-
-	// Is the CheckpointCountWidget enabled?
-	if ( ($re_config['CHECKPOINTCOUNT_WIDGET'][0]['ENABLED'][0] == true) && ($re_config['States']['NiceMode'] == false) ) {
-		re_buildCheckpointCountWidget($checkpt[4], $checkpt[1]);
-	}
-
-	// Get current Gamemode
-	$gamemode = $aseco->server->gameinfo->mode;
-
-	if ( ($gamemode == Gameinfo::LAPS) && ($re_config['ROUND_SCORE'][0]['GAMEMODE'][0][Gameinfo::LAPS][0]['ENABLED'][0] == true) ) {
-
-		// Get the Player object
-		$player = $aseco->server->players->player_list[$checkpt[1]];
-
-		// Add the Score
-		$re_scores['RoundScore'][$player->login] = array(
-			'checkpointid'	=> $checkpt[4],
-			'playerid'	=> $player->pid,
-			'login'		=> $player->login,
-			'nickname'	=> re_handleSpecialChars($player->nickname),
-			'score'		=> re_formatTime($checkpt[2]),
-			'score_plain'	=> $checkpt[2]
-		);
-
-		// Display the Widget
-		re_buildRoundScoreWidget($gamemode, true);
-	}
-
-	// Only work at 'Laps'
-	if ( ($re_config['LIVE_RANKINGS'][0]['GAMEMODE'][0][Gameinfo::LAPS][0]['ENABLED'][0] == true) && ($re_config['Map']['NbCheckpoints'] !== false) ) {
-		// Let the LiveRankings refresh, when a Player drive through one
-		$re_config['States']['LiveRankings']['NeedUpdate'] = true;
-		$re_config['States']['LiveRankings']['NoRecordsFound'] = false;
+// called @ onCheckpoint (simulate finish in endurance)
+function re_onCheckpoint($aseco, $checkpoint) {
+	global $ptime, $enduro, $enduro_normal, $map_cps, $lastcptime;
+	
+	if ($enduro_normal || $enduro) {
+		$player = $aseco->server->players->getPlayer($checkpoint[1]);
+		$lastcptime[$player->id] = $checkpoint[2];
+		if (($checkpoint[4]+1) % $map_cps == 0) {
+			if (($checkpoint[4]+1) == $map_cps) {
+				$ptime[$player->id] = 0;
+			} else if (!isset($ptime[$player->id])) {
+				$ptime[$player->id] = $checkpoint[2];
+				return;
+			}
+			$rtime = $checkpoint[2] - $ptime[$player->id];
+			$ptime[$player->id] = $checkpoint[2];
+			
+			$finish_item = new Record();
+			$finish_item->player = $player;
+			$finish_item->new = false;
+			$finish_item->score = $rtime;
+			$finish_item->pos = 0;
+			$finish_item->map = $aseco->server->map;
+			
+			$aseco->releaseEvent('onPlayerFinish', $finish_item);
+		}
 	}
 }
 
@@ -7892,10 +7875,10 @@ function re_winningPayout ($player) {
 
 		// Is there an error on pay?
 		if ( $aseco->client->isError() ) {
-			$aseco->console('[plugin.records_eyepiece.php] Pay '. $re_cache['PlayerWinnings'][$player->login]['FinishPayment'] .' Planets to Player "'. $player->login .'" failed: [' . $aseco->client->getErrorCode() . '] ' . $aseco->client->getErrorMessage());
+			$aseco->console('[plugin.records_eyepiece_enduro.php] Pay '. $re_cache['PlayerWinnings'][$player->login]['FinishPayment'] .' Planets to Player "'. $player->login .'" failed: [' . $aseco->client->getErrorCode() . '] ' . $aseco->client->getErrorMessage());
 		}
 		else {
-			$aseco->console('[plugin.records_eyepiece.php] Pay '. $re_cache['PlayerWinnings'][$player->login]['FinishPayment'] .' Planets to Player "'. $player->login .'" done. (BillId #'. $billid .')');
+			$aseco->console('[plugin.records_eyepiece_enduro.php] Pay '. $re_cache['PlayerWinnings'][$player->login]['FinishPayment'] .' Planets to Player "'. $player->login .'" done. (BillId #'. $billid .')');
 		}
 
 		// Store the paid-off amount of Planets
@@ -17033,7 +17016,7 @@ function re_getMaplist ($mapfile = false) {
 		$mapinfos = $aseco->client->getResponse();
 
 		if ( $aseco->client->isError() ) {
-			trigger_error('[plugin.records_eyepiece.php] Error at the ListMethod GetMapList(): ['. $aseco->client->getErrorCode() .'] '. $aseco->client->getErrorMessage(), E_USER_WARNING);
+			trigger_error('[plugin.records_eyepiece_enduro.php] Error at the ListMethod GetMapList(): ['. $aseco->client->getErrorCode() .'] '. $aseco->client->getErrorMessage(), E_USER_WARNING);
 			return;
 		}
 	}
@@ -17062,7 +17045,7 @@ function re_getMaplist ($mapfile = false) {
 		}
 		catch (Exception $e) {
 			// Ignore if Map could not be parsed
-			trigger_error('[plugin.records_eyepiece.php] Could not read Map ['. $aseco->server->mapdir . re_stripBOM($mapfile) .'] at re_getMaplist(): '. $e->getMessage(), E_USER_WARNING);
+			trigger_error('[plugin.records_eyepiece_enduro.php] Could not read Map ['. $aseco->server->mapdir . re_stripBOM($mapfile) .'] at re_getMaplist(): '. $e->getMessage(), E_USER_WARNING);
 		}
 	}
 
@@ -17165,7 +17148,7 @@ function re_getMapInfoGBX ($filename) {
 		$gbx->processFile($aseco->server->mapdir . re_stripBOM($filename));
 	}
 	catch (Exception $e) {
-		trigger_error('[plugin.records_eyepiece.php] Could not read Map ['. $aseco->server->mapdir . re_stripBOM($filename) .'] at re_getMapInfoGBX(): '. $e->getMessage(), E_USER_WARNING);
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not read Map ['. $aseco->server->mapdir . re_stripBOM($filename) .'] at re_getMapInfoGBX(): '. $e->getMessage(), E_USER_WARNING);
 
 		// Ignore if Map could not be parsed
 		return re_getEmptyMapInfo();
@@ -17675,7 +17658,7 @@ function chat_setrounds($aseco, $command) {
 	$admin = $command['author'];
 	$login = $admin->login;
 		
-    if (!$aseco->isMasterAdmin($command['author'])) {
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
         return;
 	}
@@ -17698,7 +17681,7 @@ function chat_setmaps($aseco, $command) {
 	$admin = $command['author'];
 	$login = $admin->login;
 		
-    if (!$aseco->isMasterAdmin($command['author'])) {
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
         return;
 	}
@@ -17716,12 +17699,12 @@ function chat_setmaps($aseco, $command) {
 }
 
 function chat_switch($aseco, $command) {
-	global $enduro;
+	global $re_config, $enduro;
 	
 	$admin = $command['author'];
 	$login = $admin->login;
 		
-    if (!$aseco->isMasterAdmin($command['author'])) {
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
         return;
 	}
@@ -17744,7 +17727,8 @@ function chat_switch($aseco, $command) {
 	if ($enduro) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints frozen'));
 	} else if (strpos(mb_strtolower($command['params'][0]) . '.script.txt', 'endurancecup.script.txt') !== false) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: amount of CP\'s {1st place: +5 extra points}'));
+		$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: ' . join(', ', array_slice($enduro_points,0,4)) . ',......., ' . (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] . '.'));
 	}
 	
 	$aseco->client->query('SetScriptName', $command['params'][0]);
@@ -17757,7 +17741,7 @@ function chat_resetpoints($aseco, $command) {
 	$admin = $command['author'];
 	$login = $admin->login;
 		
-    if (!$aseco->isMasterAdmin($command['author'])) {
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
         return;
 	}

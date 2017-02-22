@@ -2,8 +2,17 @@
 <records_eyepiece>
 	<!-- THIS IS THE CONFIG FILE FOR THE TM2-PORT ONLY -->
 
+	<!-- EnduranceCup Gamemode Settings -->
+	<endurance_cup>
+		<!-- Rounds points array -->
+		<points>15,12,10,8,6,5,4,3,2,1</points>
+		
+		<!-- Points given to kicked out players outside the array -->
+		<points_last>0</points_last>
+	</endurance_cup>
+
 	<!-- Here you can setup some special features -->
-	<features>
+	<features>		
 		<!-- Amount of seconds the record widgets wait until they refresh if required (increase if you experience problems on populated servers) -->
 		<refresh_interval>10</refresh_interval>
 
@@ -624,7 +633,7 @@
 			{ladderrank}	= Ladderrank from Player
 			{serverrank}	= Serverrank from Player
 		//-->
-		<join_message>{#server}>> {#message}{title}: {#highlite}{nickname}$Z$S{#message} Zone: {#highlite}{zone}{#message} Visits: {#highlite}{visits}{#message}</join_message>
+		<join_message>{#server}>> {#message}{title}: {#highlite}{nickname}$Z$S{#message} Zone: {#highlite}{zone}{#message} Visits: {#highlite}{visits}{#message} Ladder: {#highlite}{ladderrank}{#message} Rank: {#highlite}{serverrank}{#message}</join_message>
 
 		<!--
 			Available placeholders:
@@ -829,13 +838,13 @@
 
 	<!-- Just a clock where the Player can adjust her/his own timezone to display the localtime -->
 	<clock_widget>
-		<enabled>false</enabled>
+		<enabled>true</enabled>
 		<timeformat>H:i</timeformat>				<!-- Usage as in PHP date() function (definitions of Seconds/Microseconds/Swatch Internet time are ignored) -->
 		<default_timezone>Europe/Berlin</default_timezone>	<!-- Which timezone should be displayed? Take a look for a list at: http://www.php.net/manual/en/timezones.php and make sure in your php.ini the 'date.timezone' is set to the localtime of the Server. -->
 		<text_color>FC0F</text_color>
 
 		<race>
-			<pos_x>44.3</pos_x>
+			<pos_x>59.3</pos_x>
 			<pos_y>39.3</pos_y>
 			<background_style>BgsPlayerCard</background_style>
 			<background_substyle>ProgressBar</background_substyle>

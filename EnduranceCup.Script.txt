@@ -1,7 +1,7 @@
 /*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduranceCup by Virtex (fsxelw)
+Modified to EnduranceCup by Virtex (fsxelw) (02-2017)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,10 +32,11 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
-#Const WarmupTime 				15000	// WARMING UP TIME IN MS (1000 = 1 second)
+#Const WarmupTime 				10000	// WARMING UP TIME IN MS (1000 = 1 second)
 #Const TimeMargeP1				30000   // START TIME MARGE
 #Const TimeMargeP2				0.95    // MULTIPLICATION PER CP (Generally <= 1.0)
-#Const MatchEndWait				15000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
+#Const MaxRoundEndWait			5000	// MAX WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
+#Const MatchEndWait				10000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
 #Const SkipIntro				1		// SKIP INTRO? (0 = no, 1 = yes)
 #Const PermitReady				0		// ALLOW PEOPLE TO READY UP TO SKIP WU? (0 = no, 1 = yes)
 
@@ -69,6 +70,67 @@ Text GetLegitBoolText(Boolean what) {
 
 declare Text EndLatestKO;
 declare Text EndWinner;
+
+Text MLGet_Player() {
+	Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
+	declare ML = "";
+	declare Text FameArrayC;
+	declare j = 0;
+		ML = """
+		<script><!--
+			
+			#Include "TextLib" as TextLib
+			Text GetTime2(Integer RealTime) {
+				declare Text r = TextLib::TimeToText(RealTime);
+				declare Text b = TextLib::ToText(RealTime+10000);
+				r ^= "."^TextLib::SubString(b, TextLib::Length(b)-3, 3);
+				return r;
+			}
+			main () {
+				declare netwrite Net_SpecTargetReq for UI = "";
+				declare netwrite Integer Net_SpecTargetCn for UI = 0;
+				declare Text plt = "";
+				declare Boolean[Text] SpectateStates;
+				declare netread Text Net_SpecSuggest for UI;
+				declare netread Integer Net_SpecSuggestTime for UI;
+				declare Integer SpecSuggestTime;
+				declare netread Integer Net_StartTime for UI;
+				declare Integer LatestSpecUpdate = 0;
+				declare Integer[Text] Fame;
+				{{{FameArrayC}}}
+
+				while(True) {
+					/*if (Net_SpecSuggestTime != SpecSuggestTime && Net_SpecSuggestTime-SpecSuggestTime < 2000) {
+						SpecSuggestTime = Net_SpecSuggestTime;
+						SetSpectateTarget(Net_SpecSuggest);
+						Net_SpecTargetReq = Net_SpecSuggest;
+						log("Setting target to "^Net_SpecSuggest);
+						Net_SpecTargetCn = Now;
+					}*/
+					for(j, 1, {{{j}}}) {
+						declare CMlLabel PTimer <=> (Page.GetFirstChild("PTimer"^j) as CMlLabel);
+						if (GameTime < Net_StartTime)
+							PTimer.SetText("0:00.000");
+						else
+							PTimer.SetText(""^GetTime2(GameTime-Net_StartTime));
+					}
+					if ((IsSpectatorMode) && LatestSpecUpdate + 1000 < Now) {
+						LatestSpecUpdate = Now;
+						if (plt != GUIPlayer.Login) {
+							plt = GUIPlayer.Login;
+							log("New spec: "^GUIPlayer.Login);
+							Net_SpecTargetReq = GUIPlayer.Login;
+							Net_SpecTargetCn = Now;
+						}
+					}
+					yield;
+				}
+			}
+		--></script>
+	""";
+		return ML;
+}
+
 Text MLGet_Info() {
 	declare ML = "";
 		ML = """
@@ -544,10 +606,8 @@ main() {
 	UiRounds = True;
 	RespawnBehaviour = CTmMode::ETMRespawnBehaviour::Normal;
 
-	// declare LayerScoresTable	<=> UIManager.UILayerCreate();
-	declare LayerInfos			<=> UIManager.UILayerCreate();
-
-	// LayerScoresTable.Type = CUILayer::EUILayerType::ScoresTable;
+	declare LayerPlayer	<=> UIManager.UILayerCreate();
+	declare LayerInfos		<=> UIManager.UILayerCreate();
 
 	// UIManager.UIAll.ScoreTableOnlyManialink = True;
 	UIManager.UIAll.ScoreTable = "";
@@ -561,7 +621,7 @@ main() {
 	declare Integer  CtRankPanelType = 1;
 	declare Boolean  CtPermitStarting = True;
 	
-	XmlRpc.SendCallback("Endurance.Reset", """{}""");
+	// XmlRpc.SendCallback("Endurance.Reset", """{}""");
 	
 	while (!ServerShutdownRequested) {
 		if (!MapLoaded)
@@ -600,19 +660,18 @@ main() {
 		// UIManager.UIAll.ScoreTableOnlyManialink = True;
 		UIManager.UIAll.UISequence = CUIConfig::EUISequence::Playing;	
 		UIManager.UIAll.UILayers.clear();
-		// UIManager.UIAll.UILayers.add(LayerScoresTable);
+		UIManager.UIAll.UILayers.add(LayerPlayer);
 		UIManager.UIAll.UILayers.add(LayerInfos);
 		
-		// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(False, False);
-		Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
-		XmlRpc.SendCallback("Endurance.MapLoaded", """{}""");
+		LayerPlayer.ManialinkPage = MLGet_Player();
+		// XmlRpc.SendCallback("Endurance.MapLoaded", """{}""");
 		UIManager.UIAll.StatusMessage = "Please wait...";
 		UIManager.UIAll.BigMessage = CtWarmingUp;
 		declare Integer StartingAt = 0;
 		ReachTimes.clear();
-		XmlRpc.SendCallback("Endurance.MatchStarted", """{}""");
+		// XmlRpc.SendCallback("Endurance.MatchStarted", """{}""");
 		XmlRpc.SendCallback_BeginRound();
-		XmlRpc.SendCallback("Endurance.WarmingUp", """{}""");
+		// XmlRpc.SendCallback("Endurance.WarmingUp", """{}""");
 		WarmUp::Begin();
 		declare Integer LatestUiUpdate = Now;
 		while (!MatchEndRequested) {
@@ -733,13 +792,12 @@ main() {
 				break;
 			if (Now - LatestUiUpdate > 250) {
 				LatestUiUpdate = Now;
-				// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(False, True);
-				Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
+				LayerPlayer.ManialinkPage = MLGet_Player();
 			}
 			UIManager.UIAll.BigMessage = CtWarmingUp;
 			yield;
 		}
-		XmlRpc.SendCallback("Endurance.WarmingUpEnded", """{}""");
+		// XmlRpc.SendCallback("Endurance.WarmingUpEnded", """{}""");
 		WarmUp::End();
 		CutOffTimeLimit = 0;
 		UIManager.UIAll.BigMessage = "";
@@ -765,17 +823,19 @@ main() {
 		wait(!Ladder_RequestInProgress); 
 		
 		sleep(1000);
+		declare Boolean winner = False;
 		declare Integer MatchStartTime = Now;
 		ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2Round has started, GLHF!", True);
 		while (!MatchEndRequested && !ServerShutdownRequested) {
 			yield;
 			
+			winner = False;
 			if (Now-StartTime > 3000) UIManager.UIAll.StatusMessage = "";
 			// Match start
 			UIManager.UIAll.CountdownEndTime = 0;
 		
 			StartTime = Now;
-			XmlRpc.SendCallback("Endurance.RaceStarted", """{"Delay":5000}""");
+			// XmlRpc.SendCallback("Endurance.RaceStarted", """{"Delay":5000}""");
 			
 			ReachCP = 0;
 			ReachTimes.clear();
@@ -788,8 +848,7 @@ main() {
 
 			declare RoundEndRequested = False;
 			declare LastUIUpdateTime = -C_UITickPeriod;
-			// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(False, False);
-			Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
+			LayerPlayer.ManialinkPage = MLGet_Player();
 
 			PlayerDistances.clear();
 			PlayerData.clear();
@@ -878,16 +937,16 @@ main() {
 								PlayersReached[CP] = stuff;
 							}
 							PlayersReached[CP].add(E.Player.User.Name);
-							declare Integer OvertakeCount = 0;
-							declare Text Overtaken = "";
+							// declare Integer OvertakeCount = 0;
+							// declare Text Overtaken = "";
 							// Figure out who this player has passed by
-							if (PlayersReached.existskey(CP-1)) { // if that cp doesnt exist, dont do it (happens at CP1)
-								if (PlayersReached[CP-1].exists(E.Player.User.Name)) { // just an error check
-									declare Integer prevpos = PlayersReached[CP-1].keyof(E.Player.User.Name);
-									for (i, 0, prevpos) {
-										if (!PlayersReached[CP].exists(PlayersReached[CP-1][i])) {
-											OvertakeCount += 1;
-											Overtaken = PlayersReached[CP-1][i];
+							// if (PlayersReached.existskey(CP-1)) { // if that cp doesnt exist, dont do it (happens at CP1)
+								// if (PlayersReached[CP-1].exists(E.Player.User.Name)) { // just an error check
+									// declare Integer prevpos = PlayersReached[CP-1].keyof(E.Player.User.Name);
+									// for (i, 0, prevpos) {
+										// if (!PlayersReached[CP].exists(PlayersReached[CP-1][i])) {
+											// OvertakeCount += 1;
+											// Overtaken = PlayersReached[CP-1][i];
 											// ThrowMsg(UI, "$z$2c2$sYou have overtaken "^PlayersReached[CP-1][i], False);
 											// foreach (OPlayer in ConnectedPlayers) {
 												// if (OPlayer.User.Name == PlayersReached[CP-1][i]) {
@@ -897,20 +956,20 @@ main() {
 													// break;
 												// }
 											// }
-										}
-									}
-								}
-							}
-							if (OvertakeCount == 1)
-								ThrowMsg(UI, "$z$2c2$sYou have overtaken "^Overtaken, False);
-							if (OvertakeCount > 1)
-								ThrowMsg(UI, "$z$2c2$sYou have overtaken "^OvertakeCount^" people", False);
+										// }
+									// }
+								// }
+							// }
+							// if (OvertakeCount == 1)
+								// ThrowMsg(UI, "$z$2c2$sYou have overtaken "^Overtaken, False);
+							// if (OvertakeCount > 1)
+								// ThrowMsg(UI, "$z$2c2$sYou have overtaken "^OvertakeCount^" people", False);
 							// ec //
 
 							declare netwrite Integer Net_Position for UI;
 							Net_Position = PlayersReached[CP].count;
 							
-							XmlRpc.SendCallback("Endurance.Checkpoint", """{"Login":"{{{E.Player.User.Login}}}", "Checkpoint": {{{CP}}}, "Position": {{{Net_Position}}}, "Time": {{{E.RaceTime}}}, "EndLap": {{{GetLegitBoolText(E.IsEndLap)}}}, "EndRace": {{{GetLegitBoolText(E.IsEndRace)}}}, "CheckpointInLap": {{{E.CheckpointInLap}}}, "LapTime": {{{E.LapTime}}} }""");
+							// XmlRpc.SendCallback("Endurance.Checkpoint", """{"Login":"{{{E.Player.User.Login}}}", "Checkpoint": {{{CP}}}, "Position": {{{Net_Position}}}, "Time": {{{E.RaceTime}}}, "EndLap": {{{GetLegitBoolText(E.IsEndLap)}}}, "EndRace": {{{GetLegitBoolText(E.IsEndRace)}}}, "CheckpointInLap": {{{E.CheckpointInLap}}}, "LapTime": {{{E.LapTime}}} }""");
 							declare netwrite Integer Net_CP for UI;
 							Net_CP = CP;
 							if (E.Player.Score.Points == StillRacingScore + CP - 1)
@@ -925,7 +984,7 @@ main() {
 								if (Leader != E.Player.User.Login) {
 									Leader = E.Player.User.Login;
 									ThrowMsgAll(E.Player.User.Name^"$z$2c2$s takes the lead!", True);
-									XmlRpc.SendCallback("Endurance.NewLeader", """{"Login":"{{{E.Player.User.Login}}}"}""");
+									// XmlRpc.SendCallback("Endurance.NewLeader", """{"Login":"{{{E.Player.User.Login}}}"}""");
 								}
 							}
 						
@@ -1014,12 +1073,12 @@ main() {
 					if (Net_ReachTimes.existskey(CP+1) && Player.RaceStartTime != 0)
 						if (Net_ReachTimes[CP+1]-Now <= -LagMargin) { // lag margin
 							// Player.Score.Points = Now - Player.RaceStartTime - LagMargin;
-							XmlRpc.SendCallback("Endurance.Kickout", """{"Login":"{{{Player.User.Login}}}", "Time": {{{Now-Player.RaceStartTime - LagMargin}}} }""");
+							// XmlRpc.SendCallback("Endurance.Kickout", """{"Login":"{{{Player.User.Login}}}", "Time": {{{Now-Player.RaceStartTime - LagMargin}}} }""");
 							log("Kickout: "^Player.User.Login^" - "^Player.RaceStartTime);
 							if (PlayersRacing.count == 2) {
 								EndLatestKO = Player.User.Login;
 								Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
-								UI.UISequence = CUIConfig::EUISequence::Podium;
+								// UI.UISequence = CUIConfig::EUISequence::Podium;
 							} else
 								Player.RaceStartTime = 0;
 							ThrowMsgAll(Player.User.Name^"$z$2c2$s got eliminated!", False);
@@ -1052,15 +1111,8 @@ main() {
 							Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
 							EndWinner = Player.User.Login;
 							ThrowMsgAll(Player.User.Name^"$z$2c2$s wins this round!", True);
-							declare Text Output = "";
-							foreach (Score in Scores) {
-								if (Score.Points != 0) {
-									Output ^= Score.User.Login^":"^Score.Points^",";
-								}
-							}
-							enduro_scores = Output;
-							XmlRpc.SendCallback_EndRound();
-							XmlRpc.SendCallback("Endurance.Winner", """{"Login":"{{{Player.User.Login}}}"}""");
+							winner = True;
+							// XmlRpc.SendCallback("Endurance.Winner", """{"Login":"{{{Player.User.Login}}}"}""");
 							if (ExitLoopBarrier == 0) {	// if not yet processed
 								ExitLoopBarrier = Synchro_AddBarrier();
 							}
@@ -1075,8 +1127,7 @@ main() {
 				
 				if (LastUIUpdateTime + C_UITickPeriod < Now) {
 					LayerInfos.ManialinkPage = MLGet_Info();
-					// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(False, False);
-					Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
+					LayerPlayer.ManialinkPage = MLGet_Player();
 					LastUIUpdateTime = Now;
 					
 					declare UsedLayers = Ident[];
@@ -1129,7 +1180,7 @@ main() {
 					}
 					declare LayersToRemove = Ident[];
 					foreach (Layer in UIManager.UIAll.UILayers) { UsedLayers.add(Layer.Id); }
-					// UsedLayers.add(LayerScoresTable.Id);
+					UsedLayers.add(LayerPlayer.Id);
 					UsedLayers.add(LayerInfos.Id);
 					foreach (Layer in UIManager.UILayers) {
 						if (!UsedLayers.exists(Layer.Id)) {
@@ -1142,8 +1193,7 @@ main() {
 				}
 			}
 			UIManager.UIAll.StatusMessage = "";
-			// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(False, False);
-			Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
+			LayerPlayer.ManialinkPage = MLGet_Player();
 			foreach (Player in ConnectedPlayers) {
 				declare UI <=> UIManager.GetUI(Player);
 				if (UI == Null) continue;
@@ -1154,45 +1204,46 @@ main() {
 				}
 			}
 			UIManager.UIAll.CountdownEndTime = 0;
-			CutOffTimeLimit = Now+MatchEndWait;
-
 			StartTime = -1;
 			EndTime = -1;
 			Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
-			UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
-			UIManager.UIAll.ScoreTableVisibility = CUIConfig::EVisibility::ForcedVisible;
-			XmlRpc.SendCallback("Endurance.RoundEnded", """{}"""); // {todo} Scoreboard
-			UIManager.UIAll.CountdownEndTime = Now+MatchEndWait;
-			// XmlRpc.SendCallback_EndRound();
-			UIManager.UIAll.BigMessage = "";
+
+			// XmlRpc.SendCallback("Endurance.RoundEnded", """{}""");
+			if (winner) {
+				declare Text Output = "";
+				foreach (Score in Scores) {
+					Output ^= Score.User.Login^":"^Score.Points^",";
+				}
+				enduro_scores = Output;
+				XmlRpc.SendCallback_EndRound();
+			}
 			break;
 		}
-		// Match end
-		declare Text Output = "{";
-		foreach (Score in Scores) {
-			if (Score.Points != 0) {
-				if (Output != "{") 
-					Output ^= ",";
-				if (Score.Points == StillRacingScore)
-					Output ^= "\""^Score.User.Login^"\":-1";
-				else
-					Output ^= "\""^Score.User.Login^"\":"^StillRacingScore+Score.Points;
-			}
+		// declare Text Output = "{";
+		// foreach (Score in Scores) {
+			// if (Score.Points != 0) {
+				// if (Output != "{") 
+					// Output ^= ",";
+				// if (Score.Points == StillRacingScore)
+					// Output ^= "\""^Score.User.Login^"\":-1";
+				// else
+					// Output ^= "\""^Score.User.Login^"\":"^StillRacingScore+Score.Points;
+			// }
+		// }
+		// XmlRpc.SendCallback("Endurance.MatchEnded", "{\"MatchTime\":"^Now-MatchStartTime^",\"Scores\":"^Output^"}}");
+		foreach (Player in Players) {
+			UnspawnPlayer(Player);
 		}
-		XmlRpc.SendCallback("Endurance.MatchEnded", "{\"MatchTime\":"^Now-MatchStartTime^",\"Scores\":"^Output^"}}");
 		UIManager.UIAll.BigMessage = "";
 		// UIManager.UIAll.ScoreTableOnlyManialink = True;
 		UIManager.UIAll.OverlayHideRoundScores = True;
 		UIManager.UIAll.ScoreTableVisibility = CUIConfig::EVisibility::ForcedVisible;
 		Ladder_ComputeRank(CTmMode::ETmScoreSortOrder::TotalPoints);
 		Ladder_CloseMatchRequest();
-		// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(True, False);
-		Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
-		UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
-		// Fake a "wait" so players do not get banned if they have slight lag and they cross the finish at matchended {ms-bug}
-		while (CutOffTimeLimit > Now) {
-			// LayerScoresTable.ManialinkPage = MLGet_ScoreTable(True, False);
-			Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
+		LayerPlayer.ManialinkPage = MLGet_Player();
+		UIManager.UIAll.UISequence = CUIConfig::EUISequence::EndRound;
+		while (Now+MaxRoundEndWait > Now) { // Hacky fix (waiting MaxRoundEndWait ms for restart call if more rounds)
+			LayerPlayer.ManialinkPage = MLGet_Player();
 			foreach (E in PendingEvents) {
 				switch (E.Type) {
 					case CTmModeEvent::EType::GiveUp:
@@ -1205,8 +1256,24 @@ main() {
 			}
 			yield;
 		}
-		
-		// Now unspawn all players
+		CutOffTimeLimit = Now+MatchEndWait;
+		UIManager.UIAll.CountdownEndTime = CutOffTimeLimit;
+		UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
+		while (CutOffTimeLimit > Now) {
+			LayerPlayer.ManialinkPage = MLGet_Player();
+			foreach (E in PendingEvents) {
+				switch (E.Type) {
+					case CTmModeEvent::EType::GiveUp:
+						Discard(E);
+					case CTmModeEvent::EType::WayPoint: 
+						Discard(E);
+					default:
+						PassOn(E);
+				}
+			}
+			yield;
+		}
+
 		foreach (Player in ConnectedPlayers)
 			Player.RaceStartTime = 0;
 		
@@ -1225,6 +1292,6 @@ main() {
 		RequestUnloadMap();	
 		wait(!MapLoaded);	
 	}
-	// UIManager.UILayerDestroy(LayerScoresTable);
+	UIManager.UILayerDestroy(LayerPlayer);
 	UIManager.UILayerDestroy(LayerInfos);
 }

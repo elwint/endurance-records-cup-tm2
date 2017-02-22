@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <xaseco2_plugins>
-	<plugin>plugin.localdatabase_enduro.php</plugin>
+	<plugin>plugin.localdatabase.php</plugin>
 	<plugin>chat.admin.php</plugin>
 	<plugin>chat.help.php</plugin>
 	<plugin>chat.me.php</plugin>

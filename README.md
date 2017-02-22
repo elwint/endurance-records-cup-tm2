@@ -8,9 +8,7 @@ To make use of the points system, use `EnduranceCup.Script.txt`
 
 ## Warning
 
-Don't excpect it to be 100% bug free. My code is kinda garbage, I modified the files a long time ago and updated it just recently in a very short time.
-
-But at least it works :)
+Don't excpect it to be 100% bug free. A lot of improvements of the original code still needs to be done.
 
 ## Installation
 
@@ -31,14 +29,12 @@ Remove:
 Replace:
 
 ```xml
-<plugin>plugin.localdatabase.php</plugin>
 <plugin>plugin.records_eyepiece.php</plugin>
 ```
 
 with
 
 ```xml
-<plugin>plugin.localdatabase_enduro.php</plugin>
 <plugin>plugin.records_eyepiece_enduro.php</plugin>
 ```
 
@@ -48,9 +44,7 @@ A working example of `plugins.xml` can be found in the repository.
 
 The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_eyepiece_enduro.php`
 
-Your config file `localdatabase.xml` will be used for `plugin.localdatabase_enduro.php`
-
-You can change the points in `plugin.localdatabase_enduro.php`
+You can also change the points settings in `records_eyepiece_enduro.xml`
 
 ## Commands
 
