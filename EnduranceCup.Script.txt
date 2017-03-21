@@ -116,11 +116,13 @@ Text MLGet_Player() {
 					}
 					if ((IsSpectatorMode) && LatestSpecUpdate + 1000 < Now) {
 						LatestSpecUpdate = Now;
-						if (plt != GUIPlayer.Login) {
-							plt = GUIPlayer.Login;
-							log("New spec: "^GUIPlayer.Login);
-							Net_SpecTargetReq = GUIPlayer.Login;
-							Net_SpecTargetCn = Now;
+						if (GUIPlayer != Null) {
+							// log("Spec: "^GUIPlayer.Login);
+							if (plt != GUIPlayer.Login) {
+								plt = GUIPlayer.Login;
+								Net_SpecTargetReq = GUIPlayer.Login;
+								Net_SpecTargetCn = Now;
+							}
 						}
 					}
 					yield;
@@ -141,7 +143,7 @@ Text MLGet_Info() {
 		return ML;
 }
 
-Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer RankPanelType) {
+Text MLGet_Gui(Integer UIType, Integer RankPanelType) {
 	declare Text ML;
 	ML = """
 		<script><!--
@@ -160,7 +162,14 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 				declare CMlLabel TimeDiff <=> (Page.GetFirstChild("TimeDiff") as CMlLabel);
 				
 				declare LocalCP = 0;
-				declare netread Integer[Text] Net_PlayerDistances for UI;
+				declare netread Text Net_Leader for UI;
+				declare netread Text Net_LeaderNickName for UI;
+				declare CMlFrame PFrameLeader <=> (Page.GetFirstChild("Player_Leader") as CMlFrame);
+				declare CMlLabel LPlayer_Leader <=> (Page.GetFirstChild("LPlayer_Leader") as CMlLabel);
+				declare CMlFrame PFrameMain <=> (Page.GetFirstChild("Player_Main") as CMlFrame);
+				declare CMlLabel LPlayer_Main <=> (Page.GetFirstChild("LPlayer_Main") as CMlLabel);
+				
+				// declare netread Integer[Text] Net_PlayerDistances for UI;
 				declare netread Integer Net_CP for UI;
 				declare Integer CP for UI;
 				declare netread Integer Net_ReachCP for UI;
@@ -173,8 +182,8 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 				""";
 				if (RankPanelType == 1)
 					ML ^= """
-				declare CMlLabel LAbove <=> (Page.GetFirstChild("LAbove") as CMlLabel);
-				declare CMlLabel LUnder <=> (Page.GetFirstChild("LUnder") as CMlLabel);
+				// declare CMlLabel LAbove <=> (Page.GetFirstChild("LAbove") as CMlLabel);
+				// declare CMlLabel LUnder <=> (Page.GetFirstChild("LUnder") as CMlLabel);
 				declare CMlLabel LDriversLeft <=> (Page.GetFirstChild("LDriversLeft") as CMlLabel);
 				""";
 				ML^= """
@@ -239,48 +248,58 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 						""";
 						if (RankPanelType == 1)
 							ML ^= """
-						declare Above = 0;
-						declare Under = 0;
-						foreach(Login => Distance in Net_PlayerDistances) {
-							declare CMlFrame PFrame <=> (Page.GetFirstChild("Player_"^Login) as CMlFrame);
-							if (PFrame == Null)
-								continue;
-							declare YPos = (Distance+Offset-UiMovementLeft*2);
-							/*if (PFrame.PosnY != YPos) {
-								if (PFrame.PosnY-YPos > 0)
-									PFrame.PosnY -= 2;
-								else
-									PFrame.PosnY += 2;
-								if (PFrame.PosnY-YPos < 2 || PFrame.PosnY-YPos > 2 && UiMovementLeft == 0)
-									PFrame.PosnY = YPos*1.;
-							}*/
-							PFrame.PosnY -= (PFrame.PosnY-(YPos)*1.)/10.;
-							if (PFrame.PosnY >= 30) {
-								Above += 1;
-								PFrame.Hide();
-							} else if (PFrame.PosnY <= -30) {
-								Under += 1;
-								PFrame.Hide();
+						// declare Above = 0;
+						// declare Under = 0;
+						if (GUIPlayer != Null) {
+							LPlayer_Main.SetText("$s"^GUIPlayer.Name);
+							declare YPos = ((CP*20+9)+Offset-UiMovementLeft*2);
+							PFrameMain.PosnY -= (PFrameMain.PosnY-(YPos)*1.)/10.;
+							if (PFrameMain.PosnY >= 30) {
+								// Above += 1;
+								PFrameMain.Hide();
+							} else if (PFrameMain.PosnY <= -30) {
+								// Under += 1;
+								PFrameMain.Hide();
 							} else
-								PFrame.Show();
-						
+								PFrameMain.Show();
+							if (Net_Leader != "" && Net_Leader != GUIPlayer.Login) {
+								LPlayer_Leader.SetText("$s"^Net_LeaderNickName);
+								declare YPos = ((Net_ReachCP*20+9)+Offset-UiMovementLeft*2);
+								PFrameLeader.PosnY -= (PFrameLeader.PosnY-(YPos)*1.)/10.;
+								if (PFrameLeader.PosnY >= 30) {
+									// Above += 1;
+									PFrameLeader.Hide();
+								} else if (PFrameLeader.PosnY <= -30) {
+									// Under += 1;
+									PFrameLeader.Hide();
+								} else
+									PFrameLeader.Show();
+							} else {
+								PFrameLeader.Hide();
+							}
 						}
-						LAbove.SetText("$s$o"^Above);
-						LUnder.SetText("$s$o"^Under);
+						// LAbove.SetText("$s$o"^Above);
+						// LUnder.SetText("$s$o"^Under);
 						LDriversLeft.SetText("$383"^Net_DriversLeft^"$fff/$888"^Net_DriversTotal);
-						if (UiMovementLeft > 0) {
-							UiMovementLeft -= 1;
+						if (UiMovementLeft != 0) {
+							declare UiMovementDirection = 0;
+							if (UiMovementLeft > 0) {
+								UiMovementDirection = 1;
+							} else {
+								UiMovementDirection = UiMovementLeft; // Instant
+							}
+							UiMovementLeft -= UiMovementDirection;
 							for (i, -1, 2) {
 								declare CMlLabel L <=> (Page.GetFirstChild("CPL"^i) as CMlLabel);
 								declare CMlQuad Q <=> (Page.GetFirstChild("CPQ"^i) as CMlQuad);
-								L.PosnY -= 1;
-								Q.PosnY -= 1;
+								L.PosnY -= UiMovementDirection;
+								Q.PosnY -= UiMovementDirection;
 								if (i == -1) {
 									L.Hide();
 									Q.Hide();
 								}
 							}
-							Offset -= 1;
+							Offset -= UiMovementDirection;
 							if (UiMovementLeft == 0) {
 								for (i, -1, 2) {
 									declare CMlLabel L <=> (Page.GetFirstChild("CPL"^i) as CMlLabel);
@@ -293,6 +312,8 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 									}
 									if (CP+i == 0)
 										L.SetText("$000$sStart");
+									else if (CP+i == -1)
+										L.SetText("");
 									else
 										L.SetText("$000$sCP "^CP+i);
 								}
@@ -365,11 +386,17 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 						
 						LastUpdateTime = Now;
 					}
-					if (Net_CP < CP)
-						CP = Net_CP;
+					// if (Net_CP < CP)
+						// CP = Net_CP;
 					if (Net_CP != CP && UiMovementLeft == 0) {
-						UiMovementLeft = 20;
-						CP += 1;
+						if (Net_CP > CP) {
+							UiMovementLeft = 20;
+							CP += 1;
+						} else {
+							UiMovementLeft = -20*(CP-Net_CP);
+							// CP -= 1;
+							CP = Net_CP;
+						}
 					}
 					// important data, no delay
 					if (!Net_ReachTimes.existskey(Net_CP+1)) { // || CP >= Net_ReachCP
@@ -448,10 +475,10 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 			<label text="" style="TextPlayerCardScore" posn="147 -30 3" valign="center" halign="right" scale="1" id="CPL-1"/>
 			<!--Incoming CPs-->
 			
-			<label text="$s$o0" posn="150 -34 3" valign="center" halign="center" scale="0.7" id="LUnder"/>
-			<quad posn="151 -30 3" sizen="8 8" style="UIConstruction_Buttons" substyle="Drive" />
-			<label text="$s$o0" posn="150 34 3" valign="center" halign="center" scale="0.7" id="LAbove"/>
-			<quad posn="151 38 3" sizen="8 8" style="UIConstruction_Buttons" substyle="Drive" />
+			<!-- <label text="$s$o0" posn="150 -34 3" valign="center" halign="center" scale="0.7" id="LUnder"/> -->
+			<!-- <quad posn="151 -30 3" sizen="8 8" style="UIConstruction_Buttons" substyle="Drive" /> -->
+			<!-- <label text="$s$o0" posn="150 34 3" valign="center" halign="center" scale="0.7" id="LAbove"/> -->
+			<!-- <quad posn="151 38 3" sizen="8 8" style="UIConstruction_Buttons" substyle="Drive" /> -->
 			
 			<!--CPStates-->
 			
@@ -469,14 +496,24 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 			
 			<!--User Frames-->
 			""";
-			foreach(Login => Nickname in PlayerData) {
-				declare Style = "LvlRed";
-				if (Login == ForLogin) Style = "LvlGreen";
-				ML^="""<frame posn="0 0 1" id="Player_{{{Login}}}">
-				<quad style="Icons64x64_1" substyle="{{{Style}}}" sizen="4 3" posn="150 -17 6" valign="center" halign="center"/>
-				<label text="$s{{{Nickname}}}" posn="148 -17 5" valign="center" halign="right" scale="0.5"/>
-				</frame>""";
-			}
+			// foreach(Login => Nickname in PlayerData) {
+				// declare Style = "LvlRed";
+				// if (Login == ForLogin) Style = "LvlGreen";
+				// ML^="""<frame posn="0 0 1" id="Player_{{{Login}}}">
+				// <quad style="Icons64x64_1" substyle="{{{Style}}}" sizen="4 3" posn="150 -17 6" valign="center" halign="center"/>
+				// <label text="$s{{{Nickname}}}" posn="148 -17 5" valign="center" halign="right" scale="0.5"/>
+				// </frame>""";
+			// }
+			declare Style = "LvlRed";
+			ML^="""<frame posn="0 0 1" id="Player_Leader">
+			<quad style="Icons64x64_1" substyle="{{{Style}}}" sizen="4 3" posn="150 -17 6" valign="center" halign="center"/>
+			<label posn="148 -17 5" valign="center" halign="right" scale="0.5" id="LPlayer_Leader"/>
+			</frame>""";
+			Style = "LvlGreen";
+			ML^="""<frame posn="0 0 1" id="Player_Main">
+			<quad style="Icons64x64_1" substyle="{{{Style}}}" sizen="4 3" posn="150 -17 6" valign="center" halign="center"/>
+			<label posn="148 -17 5" valign="center" halign="right" scale="0.5" id="LPlayer_Main"/>
+			</frame>""";
 		ML^="""</frame>""";
 		}
 		ML^="""
@@ -509,17 +546,17 @@ Text MLGet_Gui(Integer UIType, Text[Text] PlayerData, Text ForLogin, Integer Ran
 		return ML;
 }
 
-declare Integer[Text] PlayerDistances;
-Void SetDistance(Integer T, Text Name) {
-	declare Integer Target = T+9;
-	PlayerDistances[Name] = Target;
-	foreach (Player => Distance in PlayerDistances) {
-		if (Distance == Target && Player != Name) {
-			SetDistance(Distance-7, Player);
-			break;
-		}
-	}
-}
+// declare Integer[Text] PlayerDistances;
+// Void SetDistance(Integer T, Text Name) {
+	// declare Integer Target = T+9;
+	// PlayerDistances[Name] = Target;
+	// foreach (Player => Distance in PlayerDistances) {
+		// if (Distance == Target && Player != Name) {
+			// SetDistance(Distance-7, Player);
+			// break;
+		// }
+	// }
+// }
 
 Void ThrowMsg(CUIConfig UI, Text Msg, Boolean Force) {
 	declare netwrite Text[Integer] Net_MsgText for UI;
@@ -539,7 +576,7 @@ Void ThrowMsg(CUIConfig UI, Text Msg, Boolean Force) {
 		Net_MsgTextTime[2] = Net_MsgTextTime[1];
 		Net_MsgTextTime[1] = Net_MsgTextTime[0];
 		Net_MsgTextTime[0] = Now;
-		log("THROW MSG" ^ Net_MsgTextTime[0]);
+		// log("THROW MSG" ^ Net_MsgTextTime[0]);
 	//}
 }
 
@@ -586,8 +623,24 @@ Void ResetAll() {
 		LayerGui.Type = CUILayer::EUILayerType::Normal;
 		UI.UILayers.add(LayerGui);
 		
-		declare netwrite Integer[Text] Net_PlayerDistances for UI;
-		Net_PlayerDistances = PlayerDistances;
+		// declare netwrite Integer[Text] Net_PlayerDistances for UI;
+		// Net_PlayerDistances = PlayerDistances;
+	}
+}
+
+Void WaitPass(Integer TimePass) {
+	while (TimePass > Now) {
+		foreach (E in PendingEvents) {
+			switch (E.Type) {
+				case CTmModeEvent::EType::GiveUp:
+					Discard(E);
+				case CTmModeEvent::EType::WayPoint: 
+					Discard(E);
+				default:
+					PassOn(E);
+			}
+		}
+		yield;
 	}
 }
 
@@ -614,7 +667,7 @@ main() {
 	UIManager.UIAll.SmallScoreTable = "";
 	declare Integer ReachCP;
 	declare Integer[Integer] ReachTimes;
-	declare Text[Text] PlayerData;
+	// declare Text[Text] PlayerData;
 	declare Text[][Integer] PlayersReached;
 	declare Text     CtWarmingUp = DfWarmingUp;
 	declare Boolean  CtHideWarmingUpStatus = False;
@@ -637,8 +690,8 @@ main() {
 		}
 		ReachCP = 0;
 		ReachTimes.clear();
-		PlayerDistances.clear();
-		PlayerData.clear();
+		// PlayerDistances.clear();
+		// PlayerData.clear();
 		UIManager.UIAll.StatusMessage = "Please wait...";
 		
 		declare MapWinnerId = NullId;
@@ -703,9 +756,9 @@ main() {
 					LayerGui.Type = CUILayer::EUILayerType::Normal;
 					UI.UILayers.add(LayerGui);
 					if (PermitReady == 1)
-						LayerGui.ManialinkPage = MLGet_Gui(1, PlayerData, Player.User.Login, CtRankPanelType);
+						LayerGui.ManialinkPage = MLGet_Gui(1, CtRankPanelType);
 					else
-						LayerGui.ManialinkPage = MLGet_Gui(0, PlayerData, Player.User.Login, CtRankPanelType);
+						LayerGui.ManialinkPage = MLGet_Gui(0, CtRankPanelType);
 				}
 			}
 			foreach (Player in PlayersWaiting) {
@@ -800,36 +853,35 @@ main() {
 		// XmlRpc.SendCallback("Endurance.WarmingUpEnded", """{}""");
 		WarmUp::End();
 		CutOffTimeLimit = 0;
+		declare Boolean winner = False;
 		UIManager.UIAll.BigMessage = "";
 		UIManager.UIAll.StatusMessage = "Synchronization...";
 		sleep(100);
 		declare Barrier = Synchro_AddBarrier();
 		wait(Synchro_BarrierReached(Barrier) || ServerShutdownRequested);
-		UIManager.UIAll.StatusMessage = "Starting...";
-		foreach (Player in PlayersRacing) {
-			Player.RaceStartTime = 0;
-		}
-		// ThrowMsgAll("$z$2c2$sThe match is starting...", True);
-		sleep(1000);
 		
-		Ladder_CancelMatchRequest();
-		wait(!Ladder_RequestInProgress); 
-		
-		Ladder_OpenMatch_BeginRequest(); 
-		foreach(Score in Scores) { 
-			Ladder_OpenMatch_AddPlayer(Score); 
-		}
-		Ladder_OpenMatch_EndRequest(); 
-		wait(!Ladder_RequestInProgress); 
-		
-		sleep(1000);
-		declare Boolean winner = False;
-		declare Integer MatchStartTime = Now;
-		ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2Round has started, GLHF!", True);
-		while (!MatchEndRequested && !ServerShutdownRequested) {
-			yield;
+		if (!MatchEndRequested && !ServerShutdownRequested) {
+			UIManager.UIAll.StatusMessage = "Starting...";
+			foreach (Player in PlayersRacing) {
+				Player.RaceStartTime = 0;
+			}
+			// ThrowMsgAll("$z$2c2$sThe match is starting...", True);
+			sleep(1000);
 			
-			winner = False;
+			Ladder_CancelMatchRequest();
+			wait(!Ladder_RequestInProgress); 
+			
+			Ladder_OpenMatch_BeginRequest(); 
+			foreach(Score in Scores) { 
+				Ladder_OpenMatch_AddPlayer(Score); 
+			}
+			Ladder_OpenMatch_EndRequest(); 
+			wait(!Ladder_RequestInProgress); 
+			
+			sleep(1000);
+			declare Integer MatchStartTime = Now;
+			ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2Round has started, GLHF!", True);
+
 			if (Now-StartTime > 3000) UIManager.UIAll.StatusMessage = "";
 			// Match start
 			UIManager.UIAll.CountdownEndTime = 0;
@@ -850,8 +902,8 @@ main() {
 			declare LastUIUpdateTime = -C_UITickPeriod;
 			LayerPlayer.ManialinkPage = MLGet_Player();
 
-			PlayerDistances.clear();
-			PlayerData.clear();
+			// PlayerDistances.clear();
+			// PlayerData.clear();
 			PlayersReached.clear();
 			foreach (Player in ConnectedPlayers) {
 				declare UI <=> UIManager.GetUI(Player);
@@ -877,8 +929,8 @@ main() {
 					Player.RaceStartTime = Now+5000;
 					declare Integer LapStart for Player = 0;
 					LapStart = Player.RaceStartTime;
-					SetDistance(0, Player.User.Login);
-					PlayerData[Player.User.Login] = Player.User.Name;
+					// SetDistance(0, Player.User.Login);
+					// PlayerData[Player.User.Login] = Player.User.Name;
 					Player.Score.Points = StillRacingScore;
 				}
 			}
@@ -890,13 +942,14 @@ main() {
 				declare LayerGui <=> UIManager.UILayerCreate();
 				LayerGui.Type = CUILayer::EUILayerType::Normal;
 				UI.UILayers.add(LayerGui);
-				LayerGui.ManialinkPage = MLGet_Gui(0, PlayerData, Player.User.Login, CtRankPanelType);
+				LayerGui.ManialinkPage = MLGet_Gui(0, CtRankPanelType);
 				
-				declare netwrite Integer[Text] Net_PlayerDistances for UI;
-				Net_PlayerDistances = PlayerDistances;
+				// declare netwrite Integer[Text] Net_PlayerDistances for UI;
+				// Net_PlayerDistances = PlayerDistances;
 			}
 			declare Integer TimeMarge = TimeMargeP1;
 			declare Text Leader = "";
+			declare Text LeaderNickName = "";
 			declare ExitLoopBarrier = 0;
 			EndLatestKO = "";
 			EndWinner = "";
@@ -974,7 +1027,7 @@ main() {
 							Net_CP = CP;
 							if (E.Player.Score.Points == StillRacingScore + CP - 1)
 								E.Player.Score.Points = StillRacingScore + CP;
-							SetDistance(CP*20, E.Player.User.Login);
+							// SetDistance(CP*20, E.Player.User.Login);
 							
 							// If leader, set a new global goal //
 							if (CP > ReachCP) {
@@ -983,6 +1036,7 @@ main() {
 								TimeMarge = MathLib::NearestInteger((TimeMarge*1.)*TimeMargeP2);
 								if (Leader != E.Player.User.Login) {
 									Leader = E.Player.User.Login;
+									LeaderNickName = E.Player.User.Name;
 									ThrowMsgAll(E.Player.User.Name^"$z$2c2$s takes the lead!", True);
 									// XmlRpc.SendCallback("Endurance.NewLeader", """{"Login":"{{{E.Player.User.Login}}}"}""");
 								}
@@ -1049,13 +1103,15 @@ main() {
 						declare LayerGui <=> UIManager.UILayerCreate();
 						LayerGui.Type = CUILayer::EUILayerType::Normal;
 						UI.UILayers.add(LayerGui);
-						LayerGui.ManialinkPage = MLGet_Gui(0, PlayerData, Player.User.Login, CtRankPanelType);
+						LayerGui.ManialinkPage = MLGet_Gui(0, CtRankPanelType);
 					}
 					UI.ForceSpectator = Player.RaceStartTime == 0;
 					declare netwrite Text[] Net_Racers for UI;
 					Net_Racers = Racers;
 					declare netwrite Text Net_Leader for UI;
 					Net_Leader = Leader;
+					declare netwrite Text Net_LeaderNickName for UI;
+					Net_LeaderNickName = LeaderNickName;
 					declare netwrite Integer Net_ReachCP for UI;
 					declare netwrite Integer[Integer] Net_ReachTimes for UI;
 					declare netwrite Integer Net_DriversLeft for UI;
@@ -1136,8 +1192,8 @@ main() {
 							Player.Score.Points = 0;
 						declare UI <=> UIManager.GetUI(Player);
 						if (UI == Null) continue;
-						declare netwrite Integer[Text] Net_PlayerDistances for UI;
-						Net_PlayerDistances = PlayerDistances;
+						// declare netwrite Integer[Text] Net_PlayerDistances for UI;
+						// Net_PlayerDistances = PlayerDistances;
 						declare netwrite Integer Net_StartTime for UI;
 						Net_StartTime = StartTime+5000;
 								
@@ -1209,15 +1265,6 @@ main() {
 			Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
 
 			// XmlRpc.SendCallback("Endurance.RoundEnded", """{}""");
-			if (winner) {
-				declare Text Output = "";
-				foreach (Score in Scores) {
-					Output ^= Score.User.Login^":"^Score.Points^",";
-				}
-				enduro_scores = Output;
-				XmlRpc.SendCallback_EndRound();
-			}
-			break;
 		}
 		// declare Text Output = "{";
 		// foreach (Score in Scores) {
@@ -1235,43 +1282,28 @@ main() {
 			UnspawnPlayer(Player);
 		}
 		UIManager.UIAll.BigMessage = "";
-		// UIManager.UIAll.ScoreTableOnlyManialink = True;
-		UIManager.UIAll.OverlayHideRoundScores = True;
-		UIManager.UIAll.ScoreTableVisibility = CUIConfig::EVisibility::ForcedVisible;
-		Ladder_ComputeRank(CTmMode::ETmScoreSortOrder::TotalPoints);
-		Ladder_CloseMatchRequest();
-		LayerPlayer.ManialinkPage = MLGet_Player();
-		UIManager.UIAll.UISequence = CUIConfig::EUISequence::EndRound;
-		while (Now+MaxRoundEndWait > Now) { // Hacky fix (waiting MaxRoundEndWait ms for restart call if more rounds)
-			LayerPlayer.ManialinkPage = MLGet_Player();
-			foreach (E in PendingEvents) {
-				switch (E.Type) {
-					case CTmModeEvent::EType::GiveUp:
-						Discard(E);
-					case CTmModeEvent::EType::WayPoint: 
-						Discard(E);
-					default:
-						PassOn(E);
-				}
+		UIManager.UIAll.StatusMessage = "";
+		if (winner) {
+			declare Text Output = "";
+			foreach (Score in Scores) {
+				Output ^= Score.User.Login^":"^Score.Points^",";
 			}
-			yield;
-		}
-		CutOffTimeLimit = Now+MatchEndWait;
-		UIManager.UIAll.CountdownEndTime = CutOffTimeLimit;
-		UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
-		while (CutOffTimeLimit > Now) {
+			enduro_scores = Output;
+			XmlRpc.SendCallback_EndRound();
+
+			// UIManager.UIAll.ScoreTableOnlyManialink = True;
+			UIManager.UIAll.OverlayHideRoundScores = True;
+			UIManager.UIAll.ScoreTableVisibility = CUIConfig::EVisibility::ForcedVisible;
+			Ladder_ComputeRank(CTmMode::ETmScoreSortOrder::TotalPoints);
+			Ladder_CloseMatchRequest();
 			LayerPlayer.ManialinkPage = MLGet_Player();
-			foreach (E in PendingEvents) {
-				switch (E.Type) {
-					case CTmModeEvent::EType::GiveUp:
-						Discard(E);
-					case CTmModeEvent::EType::WayPoint: 
-						Discard(E);
-					default:
-						PassOn(E);
-				}
-			}
-			yield;
+			UIManager.UIAll.UISequence = CUIConfig::EUISequence::EndRound;
+			declare Integer RoundEndWait = Now+MaxRoundEndWait; // Hacky fix (waiting MaxRoundEndWait ms for restart call if more rounds)
+			WaitPass(RoundEndWait);
+			CutOffTimeLimit = Now+MatchEndWait;
+			UIManager.UIAll.CountdownEndTime = CutOffTimeLimit;
+			UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
+			WaitPass(CutOffTimeLimit);
 		}
 
 		foreach (Player in ConnectedPlayers)

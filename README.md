@@ -55,3 +55,5 @@ You can also change the points settings in `records_eyepiece_enduro.xml`
 /resetpoints [Reset total points]
 
 /switch [Switch to another script]
+
+/fakeplayer [Connect/disconnect fakeplayer(s)] (DEBUG)
