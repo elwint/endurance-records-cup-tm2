@@ -1,7 +1,7 @@
 /*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduranceCup by Virtex (fsxelw) (02-2017)
+Modified to EnduranceCup by Virtex (fsxelw) (03-2017)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Include "MathLib" as MathLib
 #Include "TextLib" as TextLib
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
-#Const	Version				"V1.4b-alpha public V1.0-cup"
+#Const	Version				"V1.4b-alpha public V2.0-cup"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
@@ -114,15 +114,13 @@ Text MLGet_Player() {
 						else
 							PTimer.SetText(""^GetTime2(GameTime-Net_StartTime));
 					}
-					if ((IsSpectatorMode) && LatestSpecUpdate + 1000 < Now) {
+					if (GUIPlayer != Null && (IsSpectatorMode) && LatestSpecUpdate + 1000 < Now) {
 						LatestSpecUpdate = Now;
-						if (GUIPlayer != Null) {
-							// log("Spec: "^GUIPlayer.Login);
-							if (plt != GUIPlayer.Login) {
-								plt = GUIPlayer.Login;
-								Net_SpecTargetReq = GUIPlayer.Login;
-								Net_SpecTargetCn = Now;
-							}
+						// log("Spec: "^GUIPlayer.Login);
+						if (plt != GUIPlayer.Login) {
+							plt = GUIPlayer.Login;
+							Net_SpecTargetReq = GUIPlayer.Login;
+							Net_SpecTargetCn = Now;
 						}
 					}
 					yield;
@@ -386,15 +384,12 @@ Text MLGet_Gui(Integer UIType, Integer RankPanelType) {
 						
 						LastUpdateTime = Now;
 					}
-					// if (Net_CP < CP)
-						// CP = Net_CP;
 					if (Net_CP != CP && UiMovementLeft == 0) {
 						if (Net_CP > CP) {
 							UiMovementLeft = 20;
 							CP += 1;
 						} else {
 							UiMovementLeft = -20*(CP-Net_CP);
-							// CP -= 1;
 							CP = Net_CP;
 						}
 					}
@@ -645,12 +640,13 @@ Void WaitPass(Integer TimePass) {
 }
 
 main() {
-	log("== Restart ==");
-	log("Mode: EnduranceCup");
-	log("Author: TGYoshi");
-	log("Modified for cup by: Virtex");
-	log("=============");
+	// log("== Restart ==");
+	// log("Mode: EnduranceCup");
+	// log("Author: TGYoshi");
+	// log("Modified for cup by: Virtex");
+	// log("=============");
 	// declare netwrite endmaps for XmlRpc = 0;
+	log("== New Round ==");
 	declare netwrite enduro_scores for XmlRpc = "";
 	IndependantLaps = False;
 	NbLaps = 0;
@@ -688,6 +684,7 @@ main() {
 			if (UI == Null) continue;
 			UI.ForceSpectator = False;
 		}
+		sleep(1000); // Give time to client to unfollow other player before spawning in order to follow client player (MP bug)
 		ReachCP = 0;
 		ReachTimes.clear();
 		// PlayerDistances.clear();
@@ -711,7 +708,7 @@ main() {
 		
 		UIManager.ResetAll();		
 		// UIManager.UIAll.ScoreTableOnlyManialink = True;
-		UIManager.UIAll.UISequence = CUIConfig::EUISequence::Playing;	
+		UIManager.UIAll.UISequence = CUIConfig::EUISequence::Playing;
 		UIManager.UIAll.UILayers.clear();
 		UIManager.UIAll.UILayers.add(LayerPlayer);
 		UIManager.UIAll.UILayers.add(LayerInfos);
@@ -926,7 +923,7 @@ main() {
 				Net_Position = 1;
 				Player.Score.Clear();
 				if (Players.exists(Player)) {
-					Player.RaceStartTime = Now+5000;
+					Player.RaceStartTime = Now+3000;
 					declare Integer LapStart for Player = 0;
 					LapStart = Player.RaceStartTime;
 					// SetDistance(0, Player.User.Login);
@@ -1278,9 +1275,8 @@ main() {
 			// }
 		// }
 		// XmlRpc.SendCallback("Endurance.MatchEnded", "{\"MatchTime\":"^Now-MatchStartTime^",\"Scores\":"^Output^"}}");
-		foreach (Player in Players) {
-			UnspawnPlayer(Player);
-		}
+		foreach (Player in ConnectedPlayers)
+			Player.RaceStartTime = 0;
 		UIManager.UIAll.BigMessage = "";
 		UIManager.UIAll.StatusMessage = "";
 		if (winner) {
@@ -1305,9 +1301,6 @@ main() {
 			UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
 			WaitPass(CutOffTimeLimit);
 		}
-
-		foreach (Player in ConnectedPlayers)
-			Player.RaceStartTime = 0;
 		
 		UIManager.UIAll.UILayers.clear();	
 		UIManager.UIAll.UISequence = CUIConfig::EUISequence::None;	

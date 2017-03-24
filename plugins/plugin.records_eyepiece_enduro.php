@@ -14,7 +14,7 @@
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (EnduranceCup) (02-2017)
+ * Modified by: Virtex (fsxelw) (EnduranceCup) (03-2017)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -17743,7 +17743,7 @@ function chat_switch($aseco, $command) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints frozen'));
 	} else if (strpos(mb_strtolower($command['params'][0]) . '.script.txt', 'endurancecup.script.txt') !== false) {
 		$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: ' . join(', ', array_slice($enduro_points,0,4)) . ',......., ' . (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] . '.'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: ' . join(', ', $enduro_points) . ', ' . (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] . '...'));
 	}
 	
 	$aseco->client->query('SetScriptName', $command['params'][0]);
