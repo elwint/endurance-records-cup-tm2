@@ -48,12 +48,20 @@ You can also change the points settings in `records_eyepiece_enduro.xml`
 
 ## Commands
 
-/setrounds [Set the amount of endurance rounds (default: 3)]
+/points [Show points system]
 
-/setmaps [Set the amount of endurance maps (default: 1)]
+/switch [Switch to another script] (ADMIN)
 
-/resetpoints [Reset total points]
+/resetpoints [Reset total points] (ADMIN)
 
-/switch [Switch to another script]
+/whitelist [Manage whitelist] (ADMIN)
 
-/fakeplayer [Connect/disconnect fakeplayer(s)] (DEBUG)
+/kickall [Kick all players except admins and whitelisted players] (ADMIN)
+
+/setrounds [Set the amount of endurance rounds (default: 3)] (ADMIN)
+
+/setmaps [Set the amount of endurance maps (default: 1)] (ADMIN)
+
+/setdecreaser [Set multiplication per CP (default: 0.95)] (ADMIN)
+
+/fakeplayer [Connect/disconnect fakeplayer(s)] (ADMIN)(DEBUG)

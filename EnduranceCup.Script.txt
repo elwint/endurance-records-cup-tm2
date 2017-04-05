@@ -1,7 +1,7 @@
 /*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduranceCup by Virtex (fsxelw) (03-2017)
+Modified to EnduranceCup by Virtex (fsxelw) (04-2017)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,13 +28,13 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Include "MathLib" as MathLib
 #Include "TextLib" as TextLib
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
-#Const	Version				"V1.4b-alpha public V2.0-cup"
+#Const	Version				"V1.4b-alpha public V2.4-cup"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
 #Const WarmupTime 				10000	// WARMING UP TIME IN MS (1000 = 1 second)
 #Const TimeMargeP1				30000   // START TIME MARGE
-#Const TimeMargeP2				0.95    // MULTIPLICATION PER CP (Generally <= 1.0)
+#Const TimeMargeP2				0.95    // DEFAULT MULTIPLICATION PER CP (Generally <= 1.0)
 #Const MaxRoundEndWait			5000	// MAX WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
 #Const MatchEndWait				10000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
 #Const SkipIntro				1		// SKIP INTRO? (0 = no, 1 = yes)
@@ -648,6 +648,7 @@ main() {
 	// declare netwrite endmaps for XmlRpc = 0;
 	log("== New Round ==");
 	declare netwrite enduro_scores for XmlRpc = "";
+	declare netread decreaser for XmlRpc = TimeMargeP2;
 	IndependantLaps = False;
 	NbLaps = 0;
 	//HideOpponents = False;
@@ -684,7 +685,7 @@ main() {
 			if (UI == Null) continue;
 			UI.ForceSpectator = False;
 		}
-		sleep(1000); // Give time to client to unfollow other player before spawning in order to follow client player (MP bug)
+		sleep(2000); // Give time to client to unfollow other player before spawning in order to follow client player (MP bug)
 		ReachCP = 0;
 		ReachTimes.clear();
 		// PlayerDistances.clear();
@@ -1030,7 +1031,7 @@ main() {
 							if (CP > ReachCP) {
 								ReachCP = CP;
 								ReachTimes[CP] = Now+TimeMarge;
-								TimeMarge = MathLib::NearestInteger((TimeMarge*1.)*TimeMargeP2);
+								TimeMarge = MathLib::NearestInteger((TimeMarge*1.)*decreaser);
 								if (Leader != E.Player.User.Login) {
 									Leader = E.Player.User.Login;
 									LeaderNickName = E.Player.User.Name;

@@ -14,7 +14,7 @@
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (EnduranceCup) (03-2017)
+ * Modified by: Virtex (fsxelw) (EnduranceCup V1.4b-alpha public V2.4-cup) (04-2017)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -219,10 +219,17 @@ Aseco::addChatCommand('estat',				'Display one of the MoreRankingLists (see: /ey
 
 Aseco::addChatCommand('eyeset',				'Adjust some settings for the Records-Eyepiece plugin (see: /eyepiece)', true);
 
+// EnduranceCup
+Aseco::addChatCommand('points', 'Show points system');
+Aseco::addChatCommand('switch', 'Switch to another script');
+Aseco::addChatCommand('resetpoints', 'Reset total points');
+Aseco::addChatCommand('whitelist', 'Manage whitelist');
+Aseco::addChatCommand('kickall', 'Kick all players except admins and whitelisted players');
+
 Aseco::addChatCommand('setrounds', 'Set the amount of endurance rounds (default: 3)');
 Aseco::addChatCommand('setmaps', 'Set the amount of endurance maps (default: 1)');
-Aseco::addChatCommand('resetpoints', 'Reset total points');
-Aseco::addChatCommand('switch', 'Switch to another script');
+Aseco::addChatCommand('setdecreaser', 'Set multiplication per CP (default: 0.95)');
+
 Aseco::addChatCommand('fakeplayer', 'Connect/disconnect fakeplayer(s)');
 
 /*
@@ -231,19 +238,20 @@ Aseco::addChatCommand('fakeplayer', 'Connect/disconnect fakeplayer(s)');
 #///////////////////////////////////////////////////////////////////////#
 */
 
-global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $finishtime, $lastcptime;
+global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $finishtime, $lastcptime, $decreaser;
 $enduscore = array();
 $finishtime = array();
 $lastcptime = array();
 $rounds = 3;
 $maps = 1;
+$decreaser = 0.95; // Must be same as TimeMargeP2 in script
 $roundsdone = 0;
 $mapsdone = 0;
 $enduro = false;
 $enduro_normal = false;
 
 function re_onSync ($aseco, $reload = null) {
-	global $re_config, $re_scores, $re_cache;
+	global $re_config, $re_scores, $re_cache, $whitelist;
 
 	// Check for the right XAseco2-Version
 	$xaseco2_min_version = '1.02';
@@ -296,7 +304,14 @@ function re_onSync ($aseco, $reload = null) {
 	if (!isset($re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points_last" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
-
+	if (!isset($re_config['ENDURANCE_CUP'][0]['WHITELIST'][0])) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "whitelist" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+	}
+	
+	if (!$whitelist = file($re_config['ENDURANCE_CUP'][0]['WHITELIST'][0], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) {
+		$whitelist = array();
+	}
+	
 	// Transform 'TRUE' or 'FALSE' from string to boolean
 	$re_config['MAP_WIDGET'][0]['ENABLED'][0]					= ((strtoupper($re_config['MAP_WIDGET'][0]['ENABLED'][0]) == 'TRUE')					? true : false);
 	$re_config['WELCOME_WINDOW'][0]['ENABLED'][0]					= ((strtoupper($re_config['WELCOME_WINDOW'][0]['ENABLED'][0]) == 'TRUE')				? true : false);
@@ -3182,7 +3197,7 @@ function re_onPlayerConnect ($aseco, $player) {
 
 // $rasp is imported from plugin.rasp.php
 function re_onPlayerConnect2 ($aseco, $player) {
-	global $re_config, $rasp;
+	global $re_config, $rasp, $whitelist;
 
 
 	if ( ($re_config['JOIN_LEAVE_INFO'][0]['ENABLED'][0] == true) && ($aseco->startup_phase == false) ) {
@@ -3212,7 +3227,7 @@ function re_onPlayerConnect2 ($aseco, $player) {
 			$title = $aseco->isMasterAdmin($player) ? '{#logina}'.$aseco->titles['MASTERADMIN'][0] :
 				($aseco->isAdmin($player) ? '{#logina}'.$aseco->titles['ADMIN'][0] :
 				($aseco->isOperator($player) ? '{#logina}'.$aseco->titles['OPERATOR'][0] :
-				'New Player')
+				(in_array($player->login, $whitelist) ? '{#logina}Whitelisted' : 'New Player'))
 			);
 		}
 
@@ -4875,7 +4890,7 @@ function re_onBeginRound ($aseco) {
 	$finishtime = array();
 	$lastcptime = array();
 	if ($enduro) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ' . ($roundsdone+1) . '/' . $rounds . ' on map '  . ($mapsdone+1) . '/' . $maps . '.'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound $FFF' . ($roundsdone+1) . '$z/' . $rounds . ' on map '  . ($mapsdone+1) . '/' . $maps . '.'));
 	}
 
 	// Init
@@ -4957,17 +4972,17 @@ function re_onEndRound ($aseco) {
 					$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ended after $FFF' . re_formatTime($cptime) . '$z.'));
 				}
 				$player = $aseco->server->players->player_list[$player_login];
-				$msg = '$z$s$FF0> [$F00INFO$FF0] $zKicked out at $FFF'. ordinal($e+1) .'$z place.';
+				$msg = '$z$s$FF0> [$F00INFO$FF0] $zEliminated at $FFF'. ordinal($e+1) .'$z place.';
 				if ($cpn > 0) {
 					$msg = $msg.' CP: $FFF' . $cpn . '$z (';
 					$pos = 1;
 					foreach ($cp as $s_player_login=>$s_cptime) {
-						// $msg = $msg.$pos.'. '.$aseco->server->players->player_list[$s_player_login]->nickname.'$z ('.re_formatTime($s_cptime).'); ';
+						// $msg = $msg.$pos.'. '.$aseco->server->players->player_list[$s_player_login]->nickname.'$z ('.re_formatTime($s_cptime).'); '; //DEBUG
 						if ($s_player_login == $player_login)
 							break;
 						$pos++;
 					}
-					$msg = $msg.ordinal($pos) .') ('.$cptime.').';
+					$msg = $msg.ordinal($pos) .').';
 				}
 				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors($msg), $player->login);
 				if (isset($enduro_points[$e])) {
@@ -4980,7 +4995,7 @@ function re_onEndRound ($aseco) {
 						$points = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
 				}
 				addPoints($player, $points);
-				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained ' . $points . ' points.'), $player->login);
+				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained $FFF' . $points . '$z points.'), $player->login);
 			}
 		}
 
@@ -4992,7 +5007,7 @@ function re_onEndRound ($aseco) {
 
 		$roundsdone++;
 		re_buildRecordWidgets();
-		sleep(1); // EndRound sequence (if server lagg reduce this number)
+		// sleep(1); // EndRound sequence (if server lagg reduce this number)
 		if ($roundsdone < $rounds) {
 			$aseco->client->query('RestartMap');
 		} else {
@@ -5072,8 +5087,7 @@ function addPoints($player, $points) {
 	$result = mysql_query($query);
 
 	if ($result === false || mysql_affected_rows() == -1) {
-		trigger_error('Could not add points of player! (' . mysql_error() . ')' . CRLF . 'sql = ' . $query, E_USER_WARNING);
-		return;
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not add points of player! (' . mysql_error() . ')' . CRLF . 'sql = ' . $query, E_USER_WARNING);
 	}
 }
 
@@ -5085,7 +5099,7 @@ function resetPoints() {
 	$result = mysql_query($query);
 
 	if ($result === false || mysql_affected_rows() == -1) {
-		trigger_error('Could not reset points! (' . mysql_error() . ')' . CRLF . 'sql = ' . $query, E_USER_WARNING);
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not reset points! (' . mysql_error() . ')' . CRLF . 'sql = ' . $query, E_USER_WARNING);
 		return;
 	}
 	
@@ -17686,7 +17700,7 @@ function chat_setrounds($aseco, $command) {
 	if ($rounds <= 1) {
 		$rounds = 1;
 	}
-	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance rounds set to: ' . $rounds));
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance rounds set to: $FFF' . $rounds));
     $aseco->console('Endurance rounds set to: ' . $rounds);
 }
 
@@ -17709,12 +17723,12 @@ function chat_setmaps($aseco, $command) {
 	if ($maps <= 1) {
 		$maps = 1;
 	}
-	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance maps set to: ' . $maps));
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance maps set to: $FFF' . $maps));
     $aseco->console('Endurance maps set to: ' . $maps);
 }
 
 function chat_switch($aseco, $command) {
-	global $re_config, $enduro;
+	global $enduro, $decreaser;
 	
 	$admin = $command['author'];
 	$login = $admin->login;
@@ -17737,17 +17751,21 @@ function chat_switch($aseco, $command) {
         return;
 	}
 	
+	$a = $aseco->client->query('SetScriptName', $command['params'][0]);
+	if ($a != true) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Invalid script!'), $login);
+        return;
+	}
+	
 	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zSwitching to ' . $command['params'][0]));
 	$aseco->console('Switching to ' . $command['params'][0]);
 	if ($enduro) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints frozen'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points frozen'));
 	} else if (strpos(mb_strtolower($command['params'][0]) . '.script.txt', 'endurancecup.script.txt') !== false) {
-		$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: ' . join(', ', $enduro_points) . ', ' . (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] . '...'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zDecreaser: $FFF' . $decreaser . '$z (multiplication per CP)'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: use /points'));
 	}
-	
-	$aseco->client->query('SetScriptName', $command['params'][0]);
-	$aseco->client->query('RestartMap');
+	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $z$F00Use /admin res or /admin next to complete the switch.'), $login);
 }
 
 function chat_resetpoints($aseco, $command) {
@@ -17771,7 +17789,80 @@ function chat_resetpoints($aseco, $command) {
 }
 
 function chat_fakeplayer($aseco, $command) {
+	$admin = $command['author'];
+	$login = $admin->login;
+		
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+        return;
+	}
+
+	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
+	if (empty($command['params'][1]) || ($command['params'][0] != "con" && $command['params'][0] != "dis")) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Usage: /fakeplayer con <connect_amount> or /fakeplayer dis <disconnect_username>'), $login);
+        return;
+	}
+
+	if ($command['params'][0] == "con") {
+		for ($i=0; $i<(int)$command['params'][1]; $i++)
+			$aseco->client->query('ConnectFakePlayer');
+	} else {
+		$aseco->client->query('DisconnectFakePlayer', $command['params'][1]);
+	}
+}
+
+function chat_points($aseco, $command) {
 	global $re_config;
+	
+	$login = $command['author']->login;
+	$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
+	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEndurance points system: $FFF' . join(', ', $enduro_points) . ', ' . (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] . '...'), $login);
+}
+
+function chat_setdecreaser($aseco, $command) {
+	global $decreaser;
+	
+	$admin = $command['author'];
+	$login = $admin->login;
+	
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+        return;
+	}
+
+	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
+	if (isset($command['params'][0])) {
+		$a = $aseco->client->query('SetModeScriptVariables', array('decreaser' => floatval($command['params'][0])));
+		if ($a != true) {
+			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Can\'t set decreaser value!'), $login);
+			return;
+		}
+		$decreaser = floatval($command['params'][0]);
+	}
+	
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zDecreaser set to: $FFF' . $decreaser . '$z (multiplication per CP)'));
+    $aseco->console('Endurance decreaser set to: ' . $decreaser);
+}
+
+function chat_kickall($aseco, $command) {
+	global $whitelist;
+
+	$admin = $command['author'];
+	$login = $admin->login;
+
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+        return;
+	}
+
+	foreach ($aseco->server->players->player_list as &$player) {
+		if (!$aseco->isMasterAdmin($player) && !$aseco->isAdmin($player) && !in_array($player->login, $whitelist))
+			$aseco->client->query('Kick', $player->login);
+	}
+}
+
+function chat_whitelist($aseco, $command) {
+	global $whitelist, $re_config;
 
 	$admin = $command['author'];
 	$login = $admin->login;
@@ -17782,20 +17873,38 @@ function chat_fakeplayer($aseco, $command) {
 	}
 
 	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
-	if ($command['params'][0] != "con" && $command['params'][0] != "dis") {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Use: /fakeplayer con [connect_amount] or /fakeplayer dis [disconnect_username]'), $login);
-        return;
-	} else if (empty($command['params'][1])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Missing parameter: connect_amount/disconnect_username'), $login);
+	if (empty($command['params'][1]) || ($command['params'][0] != "add" && $command['params'][0] != "remove" && $command['params'][0] != "clear")) {
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zUsage: /whitelist (clear|add|remove) <player_login>'), $login);
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zWhitelisted logins: ' . join('; ', $whitelist)), $login);
         return;
 	}
 
-	if ($command['params'][0] == "con") {
-		for ($i=0; $i<(int)$command['params'][1]; $i++)
-			$aseco->client->query('ConnectFakePlayer');
+	if ($command['params'][0] == "add") {
+		if (in_array($command['params'][1], $whitelist)) {
+			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Player login already in whitelist!'), $login);
+			return;
+		} else {
+			$whitelist[] = $command['params'][1];
+			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zPlayer "'.$command['params'][1].'" added to whitelist'), $login);
+		}
+	} elseif ($command['params'][0] == "remove") {
+		if (in_array($command['params'][1], $whitelist)) {
+			$key = array_search($command['params'][1], $whitelist);
+			unset($whitelist[$key]);
+			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zPlayer "'.$command['params'][1].'" removed from whitelist'), $login);
+		} else {
+			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Player login not in whitelist!'), $login);
+			return;
+		}
 	} else {
-		$aseco->client->query('DisconnectFakePlayer', $command['params'][1]);
+		$whitelist = array();
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zWhitelist cleared'), $login);
 	}
+
+	// Update whitelist file
+	$w = file_put_contents($re_config['ENDURANCE_CUP'][0]['WHITELIST'][0], implode("\n", $whitelist));
+	if ($w == false)
+		trigger_error('[plugin.records_eyepiece_enduro.php] Unable to save whitelist to "' . $re_config['ENDURANCE_CUP'][0]['WHITELIST'][0] . '"!', E_USER_WARNING);
 }
 
 ?>
