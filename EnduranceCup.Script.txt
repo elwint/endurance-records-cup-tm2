@@ -1,7 +1,7 @@
 /*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduranceCup by Virtex (fsxelw) (04-2017)
+Modified to EnduranceCup by Virtex (fsxelw) (05-2017)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,15 +28,15 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Include "MathLib" as MathLib
 #Include "TextLib" as TextLib
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
-#Const	Version				"V1.4b-alpha public V2.4-cup"
+#Const	Version				"V1.4b-alpha public V2.7-cup"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
 #Const WarmupTime 				10000	// WARMING UP TIME IN MS (1000 = 1 second)
 #Const TimeMargeP1				30000   // START TIME MARGE
 #Const TimeMargeP2				0.95    // DEFAULT MULTIPLICATION PER CP (Generally <= 1.0)
-#Const MaxRoundEndWait			5000	// MAX WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
-#Const MatchEndWait				10000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
+#Const RoundEndWait				5000	// WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
+#Const MatchEndWait				15000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
 #Const SkipIntro				1		// SKIP INTRO? (0 = no, 1 = yes)
 #Const PermitReady				0		// ALLOW PEOPLE TO READY UP TO SKIP WU? (0 = no, 1 = yes)
 
@@ -45,8 +45,7 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 
 //// MODE CONSTANTS ////
 #Const C_UITickPeriod			200
-#Const StillRacingScore			0
-#Const LagMargin				1000
+// #Const LagMargin				1000
 #Const DfWarmingUp				"$fb2Warming up"
 
 
@@ -640,15 +639,14 @@ Void WaitPass(Integer TimePass) {
 }
 
 main() {
-	// log("== Restart ==");
-	// log("Mode: EnduranceCup");
-	// log("Author: TGYoshi");
-	// log("Modified for cup by: Virtex");
-	// log("=============");
-	// declare netwrite endmaps for XmlRpc = 0;
-	log("== New Round ==");
+	log("== Restart ==");
+	log("Mode: EnduranceCup");
+	log("Author: TGYoshi");
+	log("Modified for cup by: Virtex");
+	log("=============");
 	declare netwrite enduro_scores for XmlRpc = "";
 	declare netread decreaser for XmlRpc = TimeMargeP2;
+	declare netread Boolean last_round for XmlRpc = False;
 	IndependantLaps = False;
 	NbLaps = 0;
 	//HideOpponents = False;
@@ -674,6 +672,7 @@ main() {
 	// XmlRpc.SendCallback("Endurance.Reset", """{}""");
 	
 	while (!ServerShutdownRequested) {
+		log("== New Round ==");
 		if (!MapLoaded)
 			RequestLoadMap();
 		wait (MapLoaded);
@@ -685,12 +684,12 @@ main() {
 			if (UI == Null) continue;
 			UI.ForceSpectator = False;
 		}
+		UIManager.UIAll.StatusMessage = "Please wait...";
 		sleep(2000); // Give time to client to unfollow other player before spawning in order to follow client player (MP bug)
 		ReachCP = 0;
 		ReachTimes.clear();
 		// PlayerDistances.clear();
 		// PlayerData.clear();
-		UIManager.UIAll.StatusMessage = "Please wait...";
 		
 		declare MapWinnerId = NullId;
 		MatchEndRequested = False;
@@ -878,7 +877,10 @@ main() {
 			
 			sleep(1000);
 			declare Integer MatchStartTime = Now;
-			ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2Round has started, GLHF!", True);
+			if (last_round == True)
+				ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2LAST ROUND has started, GLHF!", True);
+			else
+				ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2Round has started, GLHF!", True);
 
 			if (Now-StartTime > 3000) UIManager.UIAll.StatusMessage = "";
 			// Match start
@@ -929,7 +931,7 @@ main() {
 					LapStart = Player.RaceStartTime;
 					// SetDistance(0, Player.User.Login);
 					// PlayerData[Player.User.Login] = Player.User.Name;
-					Player.Score.Points = StillRacingScore;
+					Player.Score.Points = 0;
 				}
 			}
 			foreach (Player in ConnectedPlayers) {
@@ -1023,8 +1025,11 @@ main() {
 							// XmlRpc.SendCallback("Endurance.Checkpoint", """{"Login":"{{{E.Player.User.Login}}}", "Checkpoint": {{{CP}}}, "Position": {{{Net_Position}}}, "Time": {{{E.RaceTime}}}, "EndLap": {{{GetLegitBoolText(E.IsEndLap)}}}, "EndRace": {{{GetLegitBoolText(E.IsEndRace)}}}, "CheckpointInLap": {{{E.CheckpointInLap}}}, "LapTime": {{{E.LapTime}}} }""");
 							declare netwrite Integer Net_CP for UI;
 							Net_CP = CP;
-							if (E.Player.Score.Points == StillRacingScore + CP - 1)
-								E.Player.Score.Points = StillRacingScore + CP;
+							// if (E.Player.Score.Points < CP)
+							if (PlayersReached[CP].count > 1000)
+								E.Player.Score.Points = CP*1000;
+							else
+								E.Player.Score.Points = CP*1000 + (1000-PlayersReached[CP].count);
 							// SetDistance(CP*20, E.Player.User.Login);
 							
 							// If leader, set a new global goal //
@@ -1125,10 +1130,11 @@ main() {
 					declare netwrite Integer[Integer] Net_ReachTimes for UI;
 					declare Integer CP for Player;
 					if (Net_ReachTimes.existskey(CP+1) && Player.RaceStartTime != 0)
-						if (Net_ReachTimes[CP+1]-Now <= -LagMargin) { // lag margin
+						// if (Net_ReachTimes[CP+1]-Now <= -LagMargin) { // lag margin
+						if (Net_ReachTimes[CP+1]-Now <= 0) {
 							// Player.Score.Points = Now - Player.RaceStartTime - LagMargin;
 							// XmlRpc.SendCallback("Endurance.Kickout", """{"Login":"{{{Player.User.Login}}}", "Time": {{{Now-Player.RaceStartTime - LagMargin}}} }""");
-							log("Kickout: "^Player.User.Login^" - "^Player.RaceStartTime);
+							// log("Kickout: "^Player.User.Login^" - "^Player.RaceStartTime);
 							if (PlayersRacing.count == 2) {
 								EndLatestKO = Player.User.Login;
 								Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
@@ -1283,7 +1289,9 @@ main() {
 		if (winner) {
 			declare Text Output = "";
 			foreach (Score in Scores) {
-				Output ^= Score.User.Login^":"^Score.Points^",";
+				if (Score.Points != 0) {
+					Output ^= Score.User.Login^":"^Score.Points^",";
+				}
 			}
 			enduro_scores = Output;
 			XmlRpc.SendCallback_EndRound();
@@ -1294,13 +1302,17 @@ main() {
 			Ladder_ComputeRank(CTmMode::ETmScoreSortOrder::TotalPoints);
 			Ladder_CloseMatchRequest();
 			LayerPlayer.ManialinkPage = MLGet_Player();
-			UIManager.UIAll.UISequence = CUIConfig::EUISequence::EndRound;
-			declare Integer RoundEndWait = Now+MaxRoundEndWait; // Hacky fix (waiting MaxRoundEndWait ms for restart call if more rounds)
-			WaitPass(RoundEndWait);
-			CutOffTimeLimit = Now+MatchEndWait;
-			UIManager.UIAll.CountdownEndTime = CutOffTimeLimit;
-			UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
-			WaitPass(CutOffTimeLimit);
+			if (last_round == False) {
+				UIManager.UIAll.UISequence = CUIConfig::EUISequence::EndRound;
+				declare Integer RoundEndWaitTime = Now+RoundEndWait;
+				WaitPass(RoundEndWaitTime);
+				continue; // Start new round
+			} else {
+				CutOffTimeLimit = Now+MatchEndWait;
+				UIManager.UIAll.CountdownEndTime = CutOffTimeLimit;
+				UIManager.UIAll.UISequence = CUIConfig::EUISequence::Podium;
+				WaitPass(CutOffTimeLimit);
+			}
 		}
 		
 		UIManager.UIAll.UILayers.clear();	
@@ -1316,7 +1328,7 @@ main() {
 		wait(Synchro_BarrierReached(Barrier2) || ServerShutdownRequested);
 		
 		RequestUnloadMap();	
-		wait(!MapLoaded);	
+		wait(!MapLoaded);
 	}
 	UIManager.UILayerDestroy(LayerPlayer);
 	UIManager.UILayerDestroy(LayerInfos);
