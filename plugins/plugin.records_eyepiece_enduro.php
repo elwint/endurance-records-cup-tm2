@@ -1,5 +1,6 @@
 <?php
-
+global $enduro_version;
+$enduro_version = "V2.8";
 /*
  * Plugin: Records Eyepiece (EnduranceCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -14,7 +15,7 @@
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (EnduranceCup V1.4b-alpha public V2.7-cup) (05-2017)
+ * Modified by: Virtex (fsxelw) (05-2017)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -4955,41 +4956,43 @@ function re_onEndRound ($aseco) {
 		$scores = array_filter(explode(",", $vars["enduro_scores"]));
 
 		$winner_time = 0;
+		$pos = 0;
+		$cp_pos = 0;
 		$cp_r = -1;
-		$cp_pos = 1;
-		foreach ($scores as $index => &$score) {
+		foreach ($scores as &$score) {
 			$cpscore = explode(":",$score);
 			$player_login = $cpscore[0];
-			$pos = $index+1;
 			$cp = (int)($cpscore[1]/1000);
+			if (!isset($lastcptime[$player_login]) || $lastcptime[$player_login] == 0) {
+				trigger_error('[plugin.records_eyepiece_enduro.php] Ignoring player login '.$player_login.' for invalid CPs! (no CP time registered)', E_USER_WARNING);
+				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Ignoring player $z'.getPlayerNickName($aseco, $player_login).'$z$i{#error} for invalid CPs! (no CP time registered)'));
+				continue;
+			}
+
+			$pos++;
 			if ($cp_r == $cp) {
 				$cp_pos++;
 			} else {
 				$cp_r = $cp;
 				$cp_pos = 1;
 			}
-			if (isset($lastcptime[$player_login]) && $lastcptime[$player_login] != 0) {
-				$cp_time = $lastcptime[$player_login];
-				if ($winner_time == 0) $winner_time = $cp_time;
-				if (isset($enduro_points[$pos-1])) {
-					$points = (int)$enduro_points[$pos-1];
-				} else {
-					if ((int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] == 0) {
-						break;
-					} else {
-						$points = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
-					}
-				}
-				addPoints($aseco->getPlayerId($player_login), $points);
 
-				if (isset($aseco->server->players->player_list[$player_login])) {
-					$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEliminated at $FFF'. ordinal($pos) .'$z place. CP: $FFF' . $cp . '$z ('. ordinal($cp_pos) .').'), $player_login);
-					$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained $FFF' . $points . '$z points.'), $player_login);
-				}
+			$cp_time = $lastcptime[$player_login];
+			if ($winner_time == 0) $winner_time = $cp_time;
+			if (isset($enduro_points[$pos-1])) {
+				$points = (int)$enduro_points[$pos-1];
 			} else {
-				// $lastcptime[$player_login] = 0;
-				trigger_error('[plugin.records_eyepiece_enduro.php] Ignoring player login '.$player_login.' for invalid CPs! (no CP time registered)', E_USER_WARNING);
-				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Ignoring player $z'.getPlayerNickName($aseco, $player_login).'$z$i{#error} for invalid CPs! (no CP time registered)'));
+				if ((int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] == 0) {
+					break;
+				} else {
+					$points = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
+				}
+			}
+			addPoints($aseco->getPlayerId($player_login), $points);
+
+			if (isset($aseco->server->players->player_list[$player_login])) {
+				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEliminated at $FFF'. ordinal($pos) .'$z place. CP: $FFF' . $cp . '$z ('. ordinal($cp_pos) .').'), $player_login);
+				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou gained $FFF' . $points . '$z points.'), $player_login);
 			}
 		}
 
@@ -5124,28 +5127,37 @@ function getPlayerNickName($aseco, $player_login) {
 
 // $rounds_points is imported from plugin.rpoints.php
 function re_onBeginMap ($aseco, $map_item) {
-	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $map_cps;
-	
-	$aseco->client->query('GetScriptName');
-	$dat = $aseco->client->getResponse();
-	if (strpos(mb_strtolower($dat['CurrentValue']), 'endurancecup.script.txt') !== false) {
-		$enduro = true;
-	} else {
-		$enduro = false;
-	}
-	
-	if (strpos(mb_strtolower($dat['CurrentValue']), 'endurance.script.txt') !== false) {
-		$enduro_normal = true;
-	} else {
-		$enduro_normal = false;
+	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $map_cps, $enduro_version;
+
+	// Get current Gamemode
+	$gamemode = $aseco->server->gameinfo->mode;
+
+	$enduro = false;
+	$enduro_normal = false;
+	if ($gamemode == Gameinfo::SCPT) {
+		$aseco->client->query('GetScriptName');
+		$dat = $aseco->client->getResponse();
+		if (strpos(mb_strtolower($dat['CurrentValue']), 'endurancecup.script.txt') !== false) {
+			$enduro = true;
+		} elseif (strpos(mb_strtolower($dat['CurrentValue']), 'endurance.script.txt') !== false) {
+			$enduro_normal = true;
+		}
 	}
 
 	if ($enduro) {
 		$roundsdone = 0;
+		$aseco->client->query('GetModeScriptVariables');
+		$vars = $aseco->client->getResponse();
+		if (strpos($vars["version"], $enduro_version . '-cup') === false) {
+			trigger_error('[plugin.records_eyepiece_enduro.php] Version mismatch! (Plugin: "' . $enduro_version . '" Script: "' .  $vars["version"] . '")', E_USER_WARNING);
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Version mismatch!'));
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Plugin: ' . $enduro_version));
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Script: ' . $vars["version"]));
+		}
 	}
-	
+
 	getPoints($aseco);
-	
+
 	$aseco->client->query('GetCurrentMapInfo');
 	$cps = $aseco->client->getResponse();
 	$map_cps = $cps['NbCheckpoints'];
@@ -5157,7 +5169,6 @@ function re_onBeginMap ($aseco, $map_item) {
 	// Check if it is time to switch from "normal" to NiceMode or back
 	re_checkServerLoad();
 
-
 	// Get the current GameInfos, things about Pointslimit in Rounds and Team...
 	$aseco->client->query('GetCurrentGameInfo', 1);
 	$re_config['CurrentGameInfos'] = $aseco->client->getResponse();
@@ -5165,9 +5176,6 @@ function re_onBeginMap ($aseco, $map_item) {
 	// Catch the "new rules" in Team and Rounds Gamemode if any
 	$re_config['CurrentGameInfos']['RoundsPointsLimit'] = (($re_config['CurrentGameInfos']['RoundsUseNewRules'] == true) ? $re_config['CurrentGameInfos']['RoundsPointsLimitNewRules'] : $re_config['CurrentGameInfos']['RoundsPointsLimit']);
 	$re_config['CurrentGameInfos']['TeamPointsLimit']   = (($re_config['CurrentGameInfos']['TeamUseNewRules']   == true) ? $re_config['CurrentGameInfos']['TeamPointsLimitNewRules']   : $re_config['CurrentGameInfos']['TeamPointsLimit']);
-
-	// Get current Gamemode
-	$gamemode = $aseco->server->gameinfo->mode;
 
 	// Setup the no-score Placeholder depending at the current Gamemode
 	if ($gamemode == Gameinfo::STNT) {
@@ -5586,14 +5594,14 @@ function re_onCheckpoint($aseco, $checkpoint) {
 			}
 			$rtime = $checkpoint[2] - $finishtime[$player->id];
 			$finishtime[$player->id] = $checkpoint[2];
-			
+
 			$finish_item = new Record();
 			$finish_item->player = $player;
 			$finish_item->new = false;
 			$finish_item->score = $rtime;
 			$finish_item->pos = 0;
 			$finish_item->map = $aseco->server->map;
-			
+
 			$aseco->releaseEvent('onPlayerFinish', $finish_item);
 		}
 	}
@@ -17777,7 +17785,7 @@ function chat_switch($aseco, $command) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points frozen'));
 	} else if (strpos(mb_strtolower($command['params'][1]) . '.script.txt', 'endurancecup.script.txt') !== false) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zDecreaser: $FFF' . $decreaser . '$z (multiplication per CP)'));
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: use /points'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: /points'));
 	}
 	if ($command['params'][0] == "res") {
 		$aseco->client->query('RestartMap');

@@ -28,7 +28,7 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Include "MathLib" as MathLib
 #Include "TextLib" as TextLib
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
-#Const	Version				"V1.4b-alpha public V2.7-cup"
+#Const	Version				"V1.4b-alpha public V2.8-cup"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
@@ -36,7 +36,7 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Const TimeMargeP1				30000   // START TIME MARGE
 #Const TimeMargeP2				0.95    // DEFAULT MULTIPLICATION PER CP (Generally <= 1.0)
 #Const RoundEndWait				5000	// WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
-#Const MatchEndWait				15000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
+#Const MatchEndWait				20000	// WAITING TIME AT MATCHEND in MS (1000 = 1 second)
 #Const SkipIntro				1		// SKIP INTRO? (0 = no, 1 = yes)
 #Const PermitReady				0		// ALLOW PEOPLE TO READY UP TO SKIP WU? (0 = no, 1 = yes)
 
@@ -641,9 +641,11 @@ Void WaitPass(Integer TimePass) {
 main() {
 	log("== Restart ==");
 	log("Mode: EnduranceCup");
+	log("Version: "^Version);
 	log("Author: TGYoshi");
 	log("Modified for cup by: Virtex");
 	log("=============");
+	declare netwrite version for XmlRpc = Version;
 	declare netwrite enduro_scores for XmlRpc = "";
 	declare netread decreaser for XmlRpc = TimeMargeP2;
 	declare netread Boolean last_round for XmlRpc = False;
@@ -1139,8 +1141,8 @@ main() {
 								EndLatestKO = Player.User.Login;
 								Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
 								// UI.UISequence = CUIConfig::EUISequence::Podium;
-							} else
-								Player.RaceStartTime = 0;
+							}
+							Player.RaceStartTime = 0;
 							ThrowMsgAll(Player.User.Name^"$z$2c2$s got eliminated!", False);
 							declare netwrite Text Net_SpecSuggest for UI;
 							Net_SpecSuggest = Leader;
@@ -1162,6 +1164,11 @@ main() {
 						}
 				}
 				if (((PlayersRacing.count == 2 && EndLatestKO != "") || PlayersRacing.count == 1) && EndOnVictory == 1) {
+					if (PlayersRacing[0] != Null)
+						PlayersRacing[0].RaceStartTime = 0;
+					if (PlayersRacing[1] != Null)
+						PlayersRacing[1].RaceStartTime = 0;
+					
 					declare Player <=> PlayersRacing[0];
 					// best code ever :p
 					if (Player.User.Login == EndLatestKO && PlayersRacing.count == 2) Player <=> PlayersRacing[1];
@@ -1178,8 +1185,7 @@ main() {
 							}
 						}
 					}
-				}
-				if (PlayersRacing.count == 0) { // if somehow all players quit not triggering the MatchEnd
+				} else if (PlayersRacing.count == 0) { // if somehow all players quit not triggering the MatchEnd
 					if (ExitLoopBarrier == 0) {	// if not yet processed
 						ExitLoopBarrier = Synchro_AddBarrier();
 					}
