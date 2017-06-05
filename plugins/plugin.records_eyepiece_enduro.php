@@ -1,8 +1,8 @@
 <?php
 global $enduro_version;
-$enduro_version = "V2.8";
+$enduro_version = "V3.0-test";
 /*
- * Plugin: Records Eyepiece (EnduranceCup)
+ * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
  * For a detailed description and documentation, please refer to:
  * http://www.undef.name/XAseco2/Records-Eyepiece.php
@@ -220,7 +220,7 @@ Aseco::addChatCommand('estat',				'Display one of the MoreRankingLists (see: /ey
 
 Aseco::addChatCommand('eyeset',				'Adjust some settings for the Records-Eyepiece plugin (see: /eyepiece)', true);
 
-// EnduranceCup
+// EnduroCup
 Aseco::addChatCommand('points', 'Show points system');
 Aseco::addChatCommand('switch', 'Switch to another script');
 Aseco::addChatCommand('resetpoints', 'Reset total points');
@@ -298,7 +298,7 @@ function re_onSync ($aseco, $reload = null) {
 		$re_config['MUSIC_WIDGET'][0]['ADVERTISE'][0] = 'true';
 	}
 	
-	// Check EnduranceCup Settings
+	// Check EnduroCup Settings
 	if ( (!isset($re_config['ENDURANCE_CUP'][0]['POINTS'][0])) || ($re_config['ENDURANCE_CUP'][0]['POINTS'][0] == '') ) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
@@ -5137,7 +5137,7 @@ function re_onBeginMap ($aseco, $map_item) {
 	if ($gamemode == Gameinfo::SCPT) {
 		$aseco->client->query('GetScriptName');
 		$dat = $aseco->client->getResponse();
-		if (strpos(mb_strtolower($dat['CurrentValue']), 'endurancecup.script.txt') !== false) {
+		if (strpos(mb_strtolower($dat['CurrentValue']), 'endurocup.script.txt') !== false) {
 			$enduro = true;
 		} elseif (strpos(mb_strtolower($dat['CurrentValue']), 'endurance.script.txt') !== false) {
 			$enduro_normal = true;
@@ -17783,7 +17783,7 @@ function chat_switch($aseco, $command) {
 	$aseco->console('Switching to ' . $command['params'][1]);
 	if ($enduro) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points frozen'));
-	} else if (strpos(mb_strtolower($command['params'][1]) . '.script.txt', 'endurancecup.script.txt') !== false) {
+	} else if (strpos(mb_strtolower($command['params'][1]) . '.script.txt', 'endurocup.script.txt') !== false) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zDecreaser: $FFF' . $decreaser . '$z (multiplication per CP)'));
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: /points'));
 	}
