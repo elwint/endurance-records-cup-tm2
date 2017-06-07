@@ -73,7 +73,7 @@ Text GetLegitBoolText(Boolean what) {
 declare Text EndLatestKO;
 declare Text EndWinner;
 
-Text MLGet_ScoreTable(Boolean ShowLP) {
+Text MLGet_ScoreTable(Boolean EndRound) {
 	declare ML = """
 	<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 	<manialink version="3" name="ScoresTable">
@@ -100,9 +100,6 @@ Text MLGet_ScoreTable(Boolean ShowLP) {
 					<frame id="framelpgain" hidden="1">
 						<quad pos="52.32 -1.68" size="3.36 3.36" scale="1.5" valign="center" style="Icons128x128_1" substyle="LadderPoints"/>
 						<label pos="51.70 -1.68" size="33.02 3.36" halign="right" valign="center2" textcolor="bb8" textsize="1.5" text="+0.0" class="text-number" id="scorecard_labellpgain"/>
-					</frame>
-					<frame id="frameendurostatus" hidden="0">
-						<quad pos="77.27 -0.3" size="4 4" halign="left" valign="center" style="Icons128x128_1" substyle="Easy" id="scorecard_quadendurostatus"/>
 					</frame>
 					<frame id="framepointsgain" hidden="1">
 						<label pos="75.57 -0.5" size="33.02 3.36" halign="left" valign="center2" textcolor="0F0" textsize="1.5" text="+250" class="text-number" id="scorecard_labelpointsgain"/>
@@ -139,7 +136,7 @@ Text MLGet_ScoreTable(Boolean ShowLP) {
 				</frame>
 				<frame id="frameplayerinfo" pos="-45 12" z-index="1">
 					<quad size="16 16" image="file://Avatars/fsxelw/Default" valign="center" id="playerinfo_avatar" />
-					<label pos="17 0" size="10 10" valign="center2" textsize="6" text="#1" class="text-number" id="playerinfo_rank" />
+					<label pos="17 0" size="10 10" valign="center2" textsize="6" text="#0" class="text-number" id="playerinfo_rank" />
 				</frame>
 				<frame id="framepager" pos="0 5" z-index="3">
 					<quad pos="-12.5 7.7" halign="center" valign="center"	size="12 12" scriptevents="1" id="pager_buttonprev" style="UIConstruction_Buttons" substyle="Quit"/>
@@ -184,22 +181,23 @@ Text MLGet_ScoreTable(Boolean ShowLP) {
 				declare Integer SpecSuggestTime;
 				declare netread Integer Net_StartTime for UI;
 				declare Integer LatestSpecUpdate = 0;
+				declare Integer LatestScoreTableUpdate = 0;
 
 				declare CMlQuad quadPlayerAvatar <=> (Page.GetFirstChild("playerinfo_avatar") as CMlQuad);
-				if (InputPlayer != Null) quadPlayerAvatar.ImageUrl = "file://Avatars/"^InputPlayer.User.Login^"/Default";
+				quadPlayerAvatar.ImageUrl = "file://Avatars/"^LocalUser.Login^"/Default";
 				while(True) {
 					foreach(Event in PendingEvents)	{
 						switch(Event.Type) {
 							case CMlEvent::Type::MouseClick: {
 								if (Event.ControlId == "columns_quadspec") {
-									declare TargetSpec for Event.Control = InputPlayer.User.Login;
+									declare TargetSpec for Event.Control = "";
 									if (TargetSpec == "")
 										continue;
 									SetSpectateTarget(TargetSpec);
 									Net_SpecTargetReq = TargetSpec;
 									Net_SpecTargetCn = Now;
 								} else if (Event.ControlId == "columns_quadprofile") {
-									declare TargetProfile for Event.Control = InputPlayer.User.Login;
+									declare TargetProfile for Event.Control = "";
 									if (TargetProfile == "")
 										continue;
 									ShowProfile(TargetProfile);
@@ -208,60 +206,118 @@ Text MLGet_ScoreTable(Boolean ShowLP) {
 						}
 					}
 
-					declare CMlLabel lblPlayerRank <=> (Page.GetFirstChild("playerinfo_rank") as CMlLabel);
-					lblPlayerRank.Value = "#"^Net_Position; // Laat scoreboard pos zien bij end round!
+					if (LatestScoreTableUpdate + {{{C_UITickPeriod}}} < Now) {
+						declare CMlLabel lblPlayerRank <=> (Page.GetFirstChild("playerinfo_rank") as CMlLabel);
+						if (InputPlayer != Null) lblPlayerRank.Value = "#"^(Scores.keyof(InputPlayer.Score)+1);
 
-					for(i, 0, 11) {
-						declare CMlFrame frmScoreboard <=> (Page.GetFirstChild("scorecard#"^i) as CMlFrame);
-						if (Scores.existskey(i)) {
-							frmScoreboard.Show();
+						for(i, 0, 11) {
+							declare CMlFrame frmScoreCard <=> (Page.GetFirstChild("scorecard#"^i) as CMlFrame);
+							if (Scores.existskey(i)) {
+								frmScoreCard.Show();
+								
+								// Variables
+								declare CMlLabel lblScore <=> (frmScoreCard.GetFirstChild("columns_labeltmpoints") as CMlLabel);
+								declare CMlQuad quadStatus <=> (frmScoreCard.GetFirstChild("scorecard_quadstatus") as CMlQuad);
+								declare CMlQuad quadSpec <=> (frmScoreCard.GetFirstChild("columns_quadspec") as CMlQuad);
+								declare LastStatusUpdate for Scores[i].User = Now;
+								declare Status for Scores[i].User = 0;
 
-							// Constant
-							declare CMlLabel lblName <=> (frmScoreboard.GetFirstChild("columns_labelname") as CMlLabel);
-							if (lblName.Value != Scores[i].User.Name) {
-								declare CMlQuad quadAvatar <=> (frmScoreboard.GetFirstChild("columns_quadavatar") as CMlQuad);
-								declare CMlLabel lblRank <=> (frmScoreboard.GetFirstChild("scorecard_localrank") as CMlLabel);
-								declare CMlLabel lblMultiRank <=> (frmScoreboard.GetFirstChild("scorecard_labelmultirank") as CMlLabel);
-								declare CMlQuad quadSpec <=> (frmScoreboard.GetFirstChild("columns_quadspec") as CMlQuad);
-								declare CMlQuad quadProfile <=> (frmScoreboard.GetFirstChild("columns_quadprofile") as CMlQuad);
-								lblName.Value = Scores[i].User.Name;
-								quadAvatar.ImageUrl = "file://Avatars/"^Scores[i].User.Login^"/Default";
-								lblRank.Value = TextLib::ToText(i+1);
-								declare Zone = _("Other");
-								declare ZoneArray = TextLib::Split("|", Scores[i].User.LadderZoneName);
-								if (ZoneArray.existskey(2)) Zone = ZoneArray[2];
-								if (Scores[i].User.LadderRank > 0) lblMultiRank.Value = TextLib::Compose("%1: %2", Zone, TextLib::ToText(Scores[i].User.LadderRank));
-								else lblMultiRank.Value = TextLib::Compose("%1: %2", Zone, _("Not ranked"));
-								declare TargetSpec for quadSpec = Scores[i].User.Login;
-								declare TargetProfile for quadProfile = Scores[i].User.Login;
-								TargetSpec = Scores[i].User.Login;
-								TargetProfile = Scores[i].User.Login;
-
-								for(j, 0, 4) {
-									declare CMlQuad quadStar <=> (frmScoreboard.GetFirstChild("columns_quadmaniastar"^j) as CMlQuad);
-									if (Scores[i].User.FameStars > j) {
-										quadStar.Show();
-									} else {
-										quadStar.Hide();
+								if (LastStatusUpdate + {{{C_UITickPeriod}}}+500 < Now || Status == 0) { // Player disconnected
+									quadStatus.Style = "Icons64x64_2";
+									quadStatus.Substyle = "DisconnectedLight";
+									quadSpec.Hide();
+								} else {
+									lblScore.Value = "CP: "^(Scores[i].Points/1000);
+									switch (Status) {
+										case 1: {
+											if ((Scores[i].Points/1000) != (Scores[0].Points/1000)) {
+												quadStatus.Style = "Icons64x64_1";
+												quadStatus.Substyle = "LvlYellow";
+											} else {
+												quadStatus.Style = "Icons64x64_1";
+												quadStatus.Substyle = "LvlGreen";
+											}
+											if (!IsSpectatorMode) quadSpec.Hide();
+											else quadSpec.Show();
+										}
+										case 2: {
+											quadStatus.Style = "Icons64x64_1";
+											quadStatus.Substyle = "LvlRed";
+											quadSpec.Hide();
+										}
+										case 3: {
+											quadStatus.Style = "BgRaceScore2";
+											quadStatus.Substyle = "Spectator";
+											quadSpec.Hide();
+										}
 									}
 								}
-							}
 
-							// Variable
-							declare CMlLabel lblScore <=> (frmScoreboard.GetFirstChild("columns_labeltmpoints") as CMlLabel);
-							lblScore.Value = "CP: "^(Scores[i].Points/1000);
-						} else {
-							frmScoreboard.Hide();
+								// Constants
+								declare CMlLabel lblName <=> (frmScoreCard.GetFirstChild("columns_labelname") as CMlLabel);
+								if (lblName.Value != Scores[i].User.Name) {
+									declare CMlQuad quadAvatar <=> (frmScoreCard.GetFirstChild("columns_quadavatar") as CMlQuad);
+									declare CMlLabel lblRank <=> (frmScoreCard.GetFirstChild("scorecard_localrank") as CMlLabel);
+									declare CMlLabel lblMultiRank <=> (frmScoreCard.GetFirstChild("scorecard_labelmultirank") as CMlLabel);
+									declare CMlQuad quadProfile <=> (frmScoreCard.GetFirstChild("columns_quadprofile") as CMlQuad);
+									declare TargetSpec for quadSpec = Scores[i].User.Login;
+									declare TargetProfile for quadProfile = Scores[i].User.Login;
+
+									lblName.Value = Scores[i].User.Name;
+									quadAvatar.ImageUrl = "file://Avatars/"^Scores[i].User.Login^"/Default";
+									lblRank.Value = TextLib::ToText(i+1);
+									declare Zone = _("Other");
+									declare ZoneArray = TextLib::Split("|", Scores[i].User.LadderZoneName);
+									if (ZoneArray.existskey(2)) Zone = ZoneArray[2];
+									if (Scores[i].User.LadderRank > 0) lblMultiRank.Value = TextLib::Compose("%1: %2", Zone, TextLib::ToText(Scores[i].User.LadderRank));
+									else lblMultiRank.Value = TextLib::Compose("%1: %2", Zone, _("Not ranked"));
+									TargetSpec = Scores[i].User.Login;
+									TargetProfile = Scores[i].User.Login;
+									if ({{{EndRound}}}) {
+										declare CMlFrame frmLpGain <=> (frmScoreCard.GetFirstChild("framelpgain") as CMlFrame);
+										declare CMlLabel lblLpGain <=> (frmScoreCard.GetFirstChild("scorecard_labellpgain") as CMlLabel);
+										frmLpGain.Show();
+										if (Scores[i].LadderScore != -1.) {
+											declare LadderPointsExplode = TextLib::Split(".", TextLib::ToText(Scores[i].LadderScore));
+											declare LadderPoints = "+0.0";
+											if (LadderPointsExplode.existskey(0)) LadderPoints = LadderPointsExplode[0];
+											if (LadderPointsExplode.existskey(1)) LadderPoints ^= "."^TextLib::SubString(LadderPointsExplode[1], 0, 2);
+											if (Scores[i].LadderScore >= 0) lblLpGain.Value = "+"^LadderPoints;
+											else lblLpGain.Value = LadderPoints;
+										}
+									}
+									for(j, 0, 4) {
+										declare CMlQuad quadStar <=> (frmScoreCard.GetFirstChild("columns_quadmaniastar"^j) as CMlQuad);
+										if (Scores[i].User.FameStars > j) {
+											quadStar.Show();
+										} else {
+											quadStar.Hide();
+										}
+									}
+								}
+							} else {
+								frmScoreCard.Hide();
+							}
 						}
+
+						foreach (Player in Players) { // (MP bug not detecting fakeplayers when next map)
+							declare LastStatusUpdate for Player.User = Now;
+							LastStatusUpdate = Now;
+							declare Status for Player.User = 2;
+							if (Player.RequestsSpectate) Status = 3;
+							else if (!Player.IsSpawned) Status = 2;
+							else Status = 1;
+						}
+						LatestScoreTableUpdate = Now;
 					}
 
 					if (GUIPlayer != Null && (IsSpectatorMode) && LatestSpecUpdate + 1000 < Now) {
-						LatestSpecUpdate = Now;
 						if (PlayerSpec != GUIPlayer.Login) {
 							PlayerSpec = GUIPlayer.Login;
 							Net_SpecTargetReq = GUIPlayer.Login;
 							Net_SpecTargetCn = Now;
 						}
+						LatestSpecUpdate = Now;
 					}
 					yield;
 				}
