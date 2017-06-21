@@ -1,10 +1,14 @@
-# Modified Records Eyepiece for Endurance(Cup) [TM2]
+# EnduroCup script and XAseco2 plugin [TM2][MP4]
 
-Support for: `Endurance.Script.txt` & `EnduranceCup.Script.txt`
+![screenshot example](https://drive.google.com/uc?export=view&id=0B-t0hZwYZIWSVGpTc1B0QjNkdU0)
 
-Working: Local Records (+ points system)
+## Modified Records Eyepiece plugin
 
-To make use of the points system, use `EnduranceCup.Script.txt`
+Works in MP4 with XAseco2.
+
+Support for: `EnduroCup.Script.txt` & `TimeAttack.Script.txt`
+
+Features: Local records + Total points system
 
 ## Warning
 
@@ -12,7 +16,7 @@ Don't excpect it to be 100% bug free. A lot of improvements of the original code
 
 ## Installation
 
-First place the files in the correct folders of XAseco2 and the script in the Scripts folder of your dedicated server.
+Place the plugin file in the XAseco2 plugin folder and the script in the Scripts folder of your dedicated server.
 
 Edit your `plugins.xml` of XAseco2:
 
@@ -44,7 +48,7 @@ A working example of `plugins.xml` can be found in the repository.
 
 The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_eyepiece_enduro.php`
 
-You can also change the points settings in `records_eyepiece_enduro.xml`
+**Note:** when changing the points, change it in `EnduroCup.Script.txt` as well.
 
 ## Commands
 
@@ -58,9 +62,9 @@ You can also change the points settings in `records_eyepiece_enduro.xml`
 
 /kickall [Kick all players except admins and whitelisted players] (ADMIN)
 
-/setrounds [Set the amount of endurance rounds (default: 3)] (ADMIN)
+/setrounds [Set the amount of enduro rounds (default: 3)] (ADMIN)
 
-/setmaps [Set the amount of endurance maps (default: 1)] (ADMIN)
+/setmaps [Set the amount of enduro maps (default: 1)] (ADMIN)
 
 /setdecreaser [Set multiplication per CP (default: 0.95)] (ADMIN)
 

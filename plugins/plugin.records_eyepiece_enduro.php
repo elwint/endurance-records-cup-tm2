@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V3.0-test";
+$enduro_version = "V4.0";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -227,8 +227,8 @@ Aseco::addChatCommand('resetpoints', 'Reset total points');
 Aseco::addChatCommand('whitelist', 'Manage whitelist');
 Aseco::addChatCommand('kickall', 'Kick all players except admins and whitelisted players');
 
-Aseco::addChatCommand('setrounds', 'Set the amount of endurance rounds (default: 3)');
-Aseco::addChatCommand('setmaps', 'Set the amount of endurance maps (default: 1)');
+Aseco::addChatCommand('setrounds', 'Set the amount of enduro rounds (default: 3)');
+Aseco::addChatCommand('setmaps', 'Set the amount of enduro maps (default: 1)');
 Aseco::addChatCommand('setdecreaser', 'Set multiplication per CP (default: 0.95)');
 
 Aseco::addChatCommand('fakeplayer', 'Connect/disconnect fakeplayer(s)');
@@ -7397,10 +7397,13 @@ function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 	$xml .= '</manialinks>';
 
 
-//	$xml = preg_replace('/(<manialink id="(\d+)">)/', '<manialink id="${2}" version="1">', $xml);
-//	$xml = preg_replace_callback('/posn="(\S+) (\S+) (\S+)"/', 're_convertPosnToVersion1', $xml);
-//	$xml = preg_replace_callback('/sizen="(\S+) (\S+)"/', 're_convertSizenToVersion1', $xml);
+	$xml = preg_replace('/(<manialink id="(\d+)">)/', '<manialink id="${2}" version="1">', $xml);
+	$xml = preg_replace_callback('/posn="(\S+) (\S+) (\S+)"/', 're_convertPosnToVersion1', $xml);
+	$xml = preg_replace_callback('/sizen="(\S+) (\S+)"/', 're_convertSizenToVersion1', $xml);
 
+	$xml = preg_replace('/style="Icons64x64_1" substyle="Maximize"/', 'style="Bgs1" substyle="BgButton"', $xml);
+	$xml = preg_replace('/style="Icons64x64_1" substyle="ArrowUp"/', 'style="Icons64x64_1" substyle="ClipPause"', $xml);
+	$xml = preg_replace('/file:\/\/Skins\/Avatars\/Flags\//', 'file://Media/Flags/', $xml);
 
 	if ($login != false) {
 		// Send to given Player
@@ -7418,9 +7421,9 @@ function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 //#///////////////////////////////////////////////////////////////////////#
 //*/
 //
-//function re_convertPosnToVersion1 ($matches) {
-//	return 'posn="'. ($matches[1] * 2.5) .' '. ($matches[2] * 1.875) .' '. $matches[3] .'"';
-//}
+function re_convertPosnToVersion1 ($matches) {
+	return 'posn="'. ($matches[1] * 2.5) .' '. ($matches[2] * 1.875) .' '. $matches[3] .'"';
+}
 //
 ///*
 //#///////////////////////////////////////////////////////////////////////#
@@ -7428,9 +7431,9 @@ function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 //#///////////////////////////////////////////////////////////////////////#
 //*/
 //
-//function re_convertSizenToVersion1 ($matches) {
-//	return 'sizen="'. ($matches[1] * 2.5) .' '. ($matches[2] * 1.875) .'"';
-//}
+function re_convertSizenToVersion1 ($matches) {
+	return 'sizen="'. ($matches[1] * 2.5) .' '. ($matches[2] * 1.875) .'"';
+}
 
 /*
 #///////////////////////////////////////////////////////////////////////#
@@ -16516,7 +16519,7 @@ function re_loadTemplates () {
 	$header .= '<label posn="2.33 -2.4 0.03" sizen="6 0" halign="center" valign="center" textsize="3" textcolor="000F" text="$O-"/>';
 	$header .= '</frame>';
 
-	$header .= '<label posn="12.8 -55.8 0.04" sizen="32 2" halign="center" valign="center" textsize="1" scale="0.7" action="'. $re_config['ManialinkId'] .'157" focusareacolor1="0000" focusareacolor2="FFF5" textcolor="000F" text="RECORDS-EYEPIECE/'. $re_config['Version'] .'; Endurance script by TGYoshi/Tiggs. (Modified by Virtex)"/>';
+	$header .= '<label posn="17.3 -55.8 0.04" sizen="45 2" halign="center" valign="center" textsize="1" scale="0.7" action="'. $re_config['ManialinkId'] .'157" focusareacolor1="0000" focusareacolor2="FFF5" textcolor="000F" text="RECORDS-EYEPIECE/'. $re_config['Version'] .' (modified); Original Endurance script by TGYoshi/Tiggs. Modified to EnduroCup by Virtex"/>';
 	$header .= '%prev_next_buttons%';
 
 $maniascript = <<<EOL
@@ -17722,8 +17725,8 @@ function chat_setrounds($aseco, $command) {
 	} else {
 		$aseco->client->query('SetModeScriptVariables', array('last_round' => false));
 	}
-	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance rounds set to: $FFF' . $rounds));
-    $aseco->console('Endurance rounds set to: ' . $rounds);
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEnduro rounds set to: $FFF' . $rounds));
+    $aseco->console('Enduro rounds set to: ' . $rounds);
 }
 
 function chat_setmaps($aseco, $command) {
@@ -17745,8 +17748,8 @@ function chat_setmaps($aseco, $command) {
 	if ($maps <= 1) {
 		$maps = 1;
 	}
-	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEndurance maps set to: $FFF' . $maps));
-    $aseco->console('Endurance maps set to: ' . $maps);
+	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zEnduro maps set to: $FFF' . $maps));
+    $aseco->console('Enduro maps set to: ' . $maps);
 }
 
 function chat_switch($aseco, $command) {
@@ -17840,44 +17843,10 @@ function chat_fakeplayer($aseco, $command) {
 function chat_points($aseco, $command) {
 	global $re_config;
 	
-	$player = $command['author'];
+	$login = $command['author']->login;
 	$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
 	$enduro_points_last = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
-
-	// Stolen from chat.records2.php
-	$data = array();
-	$i = 1;
-	$lines = 0;
-	$player->msgs = array();
-	$player->msgs[0] = array(1, 'Endurance points system', array(0.6, 0.5, 0, 0.15), array('BgRaceScore2', 'LadderRank'));
-	foreach ($enduro_points as &$points) {
-		$data[] = array(str_pad($i, 2, '0', STR_PAD_LEFT) . '.', '', (int)$points);
-		$i++;
-		if (++$lines >= 16) {
-			$player->msgs[] = $data;
-			$lines = 0;
-			$data = array();
-		}
-	}
-	for ($j = 1; $j<=3; $j++) {
-		if ($j != 3) {
-			$m = $enduro_points_last;
-		} else {
-			$m = '...';
-		}
-		$data[] = array(str_pad($i+$j, 2, '0', STR_PAD_LEFT) . '.', '', $m);
-		if (++$lines > 20) {
-			$player->msgs[] = $data;
-			$lines = 0;
-			$data = array();
-		}
-	}
-	// add if last batch exists
-	if (!empty($data))
-		$player->msgs[] = $data;
-
-	// display ManiaLink message
-	display_manialink_multi($player);
+	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEnduroCup points system: $FFF' . join(', ', $enduro_points) . ', ' . $enduro_points_last . '...'), $login);
 }
 
 function chat_setdecreaser($aseco, $command) {
@@ -17902,7 +17871,7 @@ function chat_setdecreaser($aseco, $command) {
 	}
 	
 	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zDecreaser set to: $FFF' . $decreaser . '$z (multiplication per CP)'));
-    $aseco->console('Endurance decreaser set to: ' . $decreaser);
+    $aseco->console('Enduro decreaser set to: ' . $decreaser);
 }
 
 function chat_kickall($aseco, $command) {
