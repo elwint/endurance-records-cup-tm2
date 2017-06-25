@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V4.0";
+$enduro_version = "V4.1";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -226,6 +226,7 @@ Aseco::addChatCommand('switch', 'Switch to another script');
 Aseco::addChatCommand('resetpoints', 'Reset total points');
 Aseco::addChatCommand('whitelist', 'Manage whitelist');
 Aseco::addChatCommand('kickall', 'Kick all players except admins and whitelisted players');
+Aseco::addChatCommand('save', 'Save current total points in a CSV file');
 
 Aseco::addChatCommand('setrounds', 'Set the amount of enduro rounds (default: 3)');
 Aseco::addChatCommand('setmaps', 'Set the amount of enduro maps (default: 1)');
@@ -239,8 +240,8 @@ Aseco::addChatCommand('fakeplayer', 'Connect/disconnect fakeplayer(s)');
 #///////////////////////////////////////////////////////////////////////#
 */
 
-global $re_config, $re_scores, $re_cache, $enduscore, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $finishtime, $lastcptime, $decreaser;
-$enduscore = array();
+global $re_config, $re_scores, $re_cache, $enduro_total_points, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $finishtime, $lastcptime, $decreaser;
+$enduro_total_points = array();
 $finishtime = array();
 $lastcptime = array();
 $rounds = 3;
@@ -299,17 +300,20 @@ function re_onSync ($aseco, $reload = null) {
 	}
 	
 	// Check EnduroCup Settings
-	if ( (!isset($re_config['ENDURANCE_CUP'][0]['POINTS'][0])) || ($re_config['ENDURANCE_CUP'][0]['POINTS'][0] == '') ) {
+	if ( (!isset($re_config['ENDURO_CUP'][0]['POINTS'][0])) || ($re_config['ENDURO_CUP'][0]['POINTS'][0] == '') ) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
-	if (!isset($re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0])) {
+	if (!isset($re_config['ENDURO_CUP'][0]['POINTS_LAST'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points_last" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
-	if (!isset($re_config['ENDURANCE_CUP'][0]['WHITELIST'][0])) {
+	if (!isset($re_config['ENDURO_CUP'][0]['WHITELIST'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "whitelist" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
+	if (!isset($re_config['ENDURO_CUP'][0]['SAVE_CSV'][0])) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "save_csv" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+	}
 	
-	if (!$whitelist = file($re_config['ENDURANCE_CUP'][0]['WHITELIST'][0], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) {
+	if (!$whitelist = file($re_config['ENDURO_CUP'][0]['WHITELIST'][0], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) {
 		$whitelist = array();
 	}
 	
@@ -4949,7 +4953,7 @@ function re_onEndRound ($aseco) {
 
 	if ($enduro) {
 		$roundsdone++;
-		$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
+		$enduro_points = explode(",",$re_config['ENDURO_CUP'][0]['POINTS'][0]);
 
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
@@ -4965,7 +4969,7 @@ function re_onEndRound ($aseco) {
 			$cp = (int)($cpscore[1]/1000);
 			if (!isset($lastcptime[$player_login]) || $lastcptime[$player_login] == 0) {
 				trigger_error('[plugin.records_eyepiece_enduro.php] Ignoring player login '.$player_login.' for invalid CPs! (no CP time registered)', E_USER_WARNING);
-				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Ignoring player $z'.getPlayerNickName($aseco, $player_login).'$z$i{#error} for invalid CPs! (no CP time registered)'));
+				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Ignoring player $z'.getPlayerNickName($player_login).'$z$i{#error} for invalid CPs! (no CP time registered)'));
 				continue;
 			}
 
@@ -4977,15 +4981,14 @@ function re_onEndRound ($aseco) {
 				$cp_pos = 1;
 			}
 
-			$cp_time = $lastcptime[$player_login];
-			if ($winner_time == 0) $winner_time = $cp_time;
+			if ($winner_time == 0) $winner_time = $lastcptime[$player_login];
 			if (isset($enduro_points[$pos-1])) {
 				$points = (int)$enduro_points[$pos-1];
 			} else {
-				if ((int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0] == 0) {
+				if ((int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0] == 0) {
 					break;
 				} else {
-					$points = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
+					$points = (int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0];
 				}
 			}
 			addPoints($aseco->getPlayerId($player_login), $points);
@@ -5001,7 +5004,7 @@ function re_onEndRound ($aseco) {
 		} else {
 			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zRound ended.'));
 		}
-		getPoints($aseco);
+		getPoints();
 		$re_config['States']['LiveRankings']['NeedUpdate']	= true;
 		$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
 		// Force the refresh
@@ -5033,10 +5036,10 @@ function re_onEndRound ($aseco) {
 	}
 }
 
-function getPoints($aseco) {
-	global $enduscore, $lastcptime;
+function getPoints() {
+	global $aseco, $enduro_total_points, $lastcptime;
 
-	$enduscore = array();
+	$enduro_total_points = array();
 	$query = 'SELECT PlayerId,Login,NickName,RoundPoints FROM players_extra
 			  INNER JOIN players
 			  ON PlayerId=Id
@@ -5044,27 +5047,20 @@ function getPoints($aseco) {
 			  ORDER BY RoundPoints DESC;';
 	$result = mysql_query($query);
 
-	$pfound = array();
-	$i = 0;
 	if ($result) {
 		if (mysql_num_rows($result) > 0) {
 			while ($row = mysql_fetch_object($result)) {
-				$pfound[] =  $row->Login;
-				$enduscore[$i]['name'] = $row->Login;
-				$enduscore[$i]['nname'] = $row->NickName;
-				$enduscore[$i]['points'] = (int)$row->RoundPoints;
-				$i++;
+				$enduro_total_points[$row->Login]['name'] = $row->NickName;
+				$enduro_total_points[$row->Login]['points'] = (int)$row->RoundPoints;
 			}
 		}
 		mysql_free_result($result);
 	}
 	
 	foreach ($lastcptime as $player_login => &$value) { // Show participated players with zero points
-		if (!in_array($player_login, $pfound)) {
-			$enduscore[$i]['name'] = $player_login;
-			$enduscore[$i]['nname'] = getPlayerNickName($aseco, $player_login);
-			$enduscore[$i]['points'] = 0;
-			$i++;
+		if (!isset($enduro_total_points[$player_login])) {
+			$enduro_total_points[$player_login]['name'] = getPlayerNickName($player_login);
+			$enduro_total_points[$player_login]['points'] = 0;
 		}
 	}
 }
@@ -5081,7 +5077,7 @@ function addPoints($player_id, $points) {
 }
 
 function resetPoints() {
-	global $enduscore, $lastcptime;
+	global $enduro_total_points, $lastcptime;
 
 	$query = 'UPDATE players_extra
 			  SET RoundPoints = 0';
@@ -5092,8 +5088,8 @@ function resetPoints() {
 		return;
 	}
 
-	for ($i=0; $i < count($enduscore); $i++) {
-		$enduscore[$i]['points'] = 0;
+	foreach ($enduro_total_points as &$data) {
+		$data['points'] = 0;
 	}
 
 	foreach ($lastcptime as $player_login => &$value) { // Remove obsolete players with 0 points from total points
@@ -5111,7 +5107,8 @@ function ordinal($number) {
         return $number. $ends[$number % 10];
 }
 
-function getPlayerNickName($aseco, $player_login) {
+function getPlayerNickName($player_login) {
+	global $aseco;
 	if (isset($aseco->server->players->player_list[$player_login])) {
 		return $aseco->server->players->player_list[$player_login]->nickname;
 	} else {
@@ -5156,7 +5153,7 @@ function re_onBeginMap ($aseco, $map_item) {
 		}
 	}
 
-	getPoints($aseco);
+	getPoints();
 
 	$aseco->client->query('GetCurrentMapInfo');
 	$cps = $aseco->client->getResponse();
@@ -8047,31 +8044,18 @@ function re_getLocalRecords ($gamemode) {
 */
 
 function re_getLiveRankings ($gamemode) {
-	global $re_config, $re_scores, $re_cache, $enduscore;
+	global $re_config, $re_scores, $re_cache, $enduro_total_points;
 
-
-
-
-	if (count($enduscore) > 0) {
+	if (count($enduro_total_points) > 0) {
 		// Clean before filling
 		$re_scores['LiveRankings'] = array();
-
-
-foreach ($enduscore as $key => &$row) {
-    $points[$key]  = $row['points'];
-    $name[$key] = $row['name'];
-}
-
-array_multisort($points, SORT_DESC, $name, SORT_ASC, $enduscore);
-$re_cache['CurrentRankings'] = array();
-		for ($i=0; $i < count($enduscore); $i++) {
-
-$re_cache['CurrentRankings'][$i]['BestTime'] = 0;
-$re_cache['CurrentRankings'][$i]['Score'] = $enduscore[$i]['points'];
-$re_cache['CurrentRankings'][$i]['Login'] = $enduscore[$i]['name'];
-$re_cache['CurrentRankings'][$i]['NickName'] = $enduscore[$i]['nname'];
-
-
+		$re_cache['CurrentRankings'] = array();
+		$i = 0;
+		foreach ($enduro_total_points as $login => &$data) {
+			$re_cache['CurrentRankings'][$i]['BestTime'] = 0;
+			$re_cache['CurrentRankings'][$i]['Score'] = $data['points'];
+			$re_cache['CurrentRankings'][$i]['Login'] = $login;
+			$re_cache['CurrentRankings'][$i]['NickName'] = $data['name'];
 
 			if ( ($re_cache['CurrentRankings'][$i]['BestTime'] > 0) || ($re_cache['CurrentRankings'][$i]['Score'] >= 0) ) {
 				$re_scores['LiveRankings'][$i]['rank']		= ($i+1);
@@ -8122,6 +8106,7 @@ $re_cache['CurrentRankings'][$i]['NickName'] = $enduscore[$i]['nname'];
 				$re_scores['LiveRankings'][$i]['login']		= $re_cache['CurrentRankings'][$i]['Login'];
 				$re_scores['LiveRankings'][$i]['nickname']	= $re_cache['CurrentRankings'][$i]['NickName'];
 			}
+			$i++;
 		}
 
 		if ($gamemode == Gameinfo::TEAM) {
@@ -17648,7 +17633,7 @@ function re_stripBOM ($string) {
 #///////////////////////////////////////////////////////////////////////#
 */
 
-function re_handleSpecialChars ($string) {
+function re_handleSpecialChars ($string, $xml=true) {
 	global $re_config;
 
 
@@ -17673,28 +17658,30 @@ function re_handleSpecialChars ($string) {
 	}
 
 
-	// Convert &
-	// Convert "
-	// Convert '
-	// Convert >
-	// Convert <
-	$string = str_replace(
-			array(
-				'&',
-				'"',
-				"'",
-				'>',
-				'<'
-			),
-			array(
-				'&amp;',
-				'&quot;',
-				'&apos;',
-				'&gt;',
-				'&lt;'
-			),
-			$string
-	);
+	if ($xml) {
+		// Convert &
+		// Convert "
+		// Convert '
+		// Convert >
+		// Convert <
+		$string = str_replace(
+				array(
+					'&',
+					'"',
+					"'",
+					'>',
+					'<'
+				),
+				array(
+					'&amp;',
+					'&quot;',
+					'&apos;',
+					'&gt;',
+					'&lt;'
+				),
+				$string
+		);
+	}
 	$string = stripNewlines($string);	// stripNewlines() from basic.inc.php
 
 	return validateUTF8String($string);	// validateUTF8String() from basic.inc.php
@@ -17844,8 +17831,8 @@ function chat_points($aseco, $command) {
 	global $re_config;
 	
 	$login = $command['author']->login;
-	$enduro_points = explode(",",$re_config['ENDURANCE_CUP'][0]['POINTS'][0]);
-	$enduro_points_last = (int)$re_config['ENDURANCE_CUP'][0]['POINTS_LAST'][0];
+	$enduro_points = explode(",",$re_config['ENDURO_CUP'][0]['POINTS'][0]);
+	$enduro_points_last = (int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0];
 	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEnduroCup points system: $FFF' . join(', ', $enduro_points) . ', ' . $enduro_points_last . '...'), $login);
 }
 
@@ -17932,9 +17919,95 @@ function chat_whitelist($aseco, $command) {
 	}
 
 	// Update whitelist file
-	$w = file_put_contents($re_config['ENDURANCE_CUP'][0]['WHITELIST'][0], implode("\n", $whitelist));
-	if ($w == false && !empty($whitelist))
-		trigger_error('[plugin.records_eyepiece_enduro.php] Unable to save whitelist to "' . $re_config['ENDURANCE_CUP'][0]['WHITELIST'][0] . '"!', E_USER_WARNING);
+	$w = file_put_contents($re_config['ENDURO_CUP'][0]['WHITELIST'][0], implode("\n", $whitelist));
+	if ($w === false) trigger_error('[plugin.records_eyepiece_enduro.php] Unable to save whitelist to "' . $re_config['ENDURO_CUP'][0]['WHITELIST'][0] . '"!', E_USER_WARNING);
+}
+
+function chat_save($aseco, $command) {
+	global $re_config, $enduro_total_points;
+
+	$admin = $command['author'];
+	$login = $admin->login;
+
+    if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+        return;
+	}
+
+	$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+	$error = false;
+	if (!file_exists($csv_file)) {
+		$w = file_put_contents($csv_file, "\xEF\xBB\xBFnickname;login"); // With UTF-8 BOM
+		if ($w === false) $error = "Can't create ".$csv_file;
+	}
+
+	$new_csv = array();
+	if (!$error) {
+		if (($handle = fopen($csv_file, 'r')) !== false) {
+			$header = fgetcsv($handle, 1000, ";");
+			if ($header[0] != "\xEF\xBB\xBFnickname" || $header[1] != "login") {
+				trigger_error('[plugin.records_eyepiece_enduro.php] Invalid CSV format, created new one automatically', E_USER_WARNING);
+				fclose($handle);
+				unlink($csv_file);
+				chat_save($aseco, $command);
+				return;
+			} else {
+				$number = (int)substr(end($header), 1) + 1;
+				$header[] = "#".$number;
+				$new_csv[] = $header;
+			}
+
+			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zSaving total points (#'.$number.')...'), $login);
+			$csv_points = array();
+			while (($data = fgetcsv($handle, 1000, ";")) !== false) {
+				$csv_points[$data[1]] = $data;
+			}
+			fclose($handle);
+		} else {
+			$error = "Can't open read ".$csv_file;
+		}
+	}
+
+	foreach ($enduro_total_points as $plogin => &$pdata) { // Overwrite, new sortation
+		$data = array();
+		$data[] = re_handleSpecialChars(stripColors($pdata['name']), false);
+		$data[] = $plogin;
+		if (isset($csv_points[$plogin])) {
+			$data = array_merge($data, array_slice($csv_points[$plogin], 2));
+			unset($csv_points[$plogin]);
+		} else { // New player
+			for ($j = 1; $j < $number; $j++) {
+				$data[] = "-";
+			}
+		}
+		$data[] = $pdata['points'];
+		$new_csv[] = $data;
+	}
+
+	foreach ($csv_points as $key => &$data) { // Old player not participated
+		$data[] = "-";
+		$new_csv[] = $data;
+	}
+
+	if (!$error) {
+		if (($handle = fopen($csv_file, 'w')) !== false) {
+			foreach ($new_csv as $line) {
+			   $w = fputcsv($handle, $line, ";");
+			   if ($w === false) "Unable to write to ".$csv_file;
+			}
+			fclose($handle);
+		} else {
+			$error = "Can't open write ".$csv_file;
+		}
+	}
+
+	if ($error) {
+		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}'.$error), $login);
+		trigger_error('[plugin.records_eyepiece_enduro.php] '.$error, E_USER_WARNING);
+	} else {
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points for #'.$number.' has been saved'));
+		$aseco->console('Total points for #'.$number.' has been saved in ' . $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0]);
+	}
 }
 
 ?>

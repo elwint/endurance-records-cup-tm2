@@ -1,4 +1,4 @@
-/*
+﻿/*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
 Modified to EnduroCup by Virtex (fsxelw) (05-2017)
@@ -16,13 +16,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-/*
-Please see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.html>[1] for updates and support using this gamemode.
-If you want to submit an improvement to the gamemode, please contact me (see [1]).
-*/
-/*
-For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.html>.
-*/
 
 #RequireContext CTmMode
 #Include "MathLib" as MathLib
@@ -30,7 +23,7 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Include "Libs/Nadeo/TrackMania/TM3.Script.txt" as TM
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
 #Include "Libs/Nadeo/ModeInfo.Script.txt" as ModeInfo
-#Const	Version				"V4.0-cup V1.4b-alpha"
+#Const	Version				"V4.1-cup V1.4b-alpha"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
@@ -45,7 +38,7 @@ For to-do list, see <http://dl.dropbox.com/u/7795439/tm2/web_Endurance/index.htm
 #Const EndOnVictory				1		// Set to 0 to prevent the match from ending (debug). (default 1)
 
 //// MODE CONSTANTS ////
-#Const Description				_("""$fffTest""")
+#Const Description				_("""$fff$lhttps://www.facebook.com/TeamProfessionalsTM/$l""")
 #Const StatusMessage			_("TYPE: Free for all\nOBJECTIVE: Don't get eliminated by the timer.")
 #Const C_UITickPeriod			300
 #Const UnfollowSpawnSyncTime	3000
@@ -77,6 +70,7 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 	declare ML = """
 	<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 	<manialink version="3" name="ScoresTable">
+		<!-- Modified version of original TA scoretable, exported from \Modules\Nadeo\TrackMania\TimeAttack\ScoresTable.Module.Gbx -->
 		<stylesheet>
 			<style class="text-default" textfont="Oswald" textcolor="fff" textemboss="1"/>
 			<style class="text-number" textfont="OswaldMono" textcolor="fff" textemboss="1"/>
@@ -111,9 +105,9 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 					<quad pos="77.23 -7.11" size="3.90 3.90" halign="center" valign="center" scale="1.3" style="UIConstructionSimple_Buttons" substyle="Author" scriptevents="1" id="columns_quadprofile"/>
 					<quad pos="70.069 -5.970" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar0"/>
 					<quad pos="72.672 -3.367" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar1"/>
-					<quad pos="72.672 -5.970" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar2"/>
-					<quad pos="70.069 -3.367" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar3"/>
-					<quad pos="71.371 -4.669" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar4"/>
+					<quad pos="71.371 -4.669" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar2"/>
+					<quad pos="72.672 -5.970" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar3"/>
+					<quad pos="70.069 -3.367" size="2.603 2.603" halign="center" valign="center" style="BgRaceScore2" substyle="Fame" id="columns_quadmaniastar4"/>
 					<label pos="25.82 -4.67" size="38.53 12.45" halign="left" valign="center2" text="long player name (to check the overflow)" textsize="2.00" class="text-default" id="columns_labelname"/>
 					<quad pos="20.62 -4.67" size="7.81 7.81" image="file://Avatars/fsxelw/Default" halign="center" valign="center" id="columns_quadavatar"/>
 				</frame>
@@ -123,11 +117,11 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 			<frame pos="0 -26" id="frameheader">
 				<label pos="-91 -9" z-index="1" size="88 10" text="SCORE" class="text-default" halign="left" valign="center2" textsize="8"/>
 				<label pos="-91 -17" size="88 7" textsize="4.5" z-index="3" halign="left" valign="center2" text="RANKING" class="text-default" id="header_title"/>
-				<label pos="97.5 -17+" size="94 10" text="$fffEnduroCup" halign="right" textsize="6" id="additionnalinfo_servername"	valign="center2" class="text-default"/>
+				<label pos="97.5 -17+" size="94 10" text="$fffEnduroCup" halign="right" textsize="6" id="additionnalinfo_servername" valign="center2" class="text-default"/>
 				<quad pos="-94.5 -11.5" z-index="-1" size="1.4 16.5" halign="right" valign="center" bgcolor="fff" />
 				<quad pos="41.66 -11.21" size="7.47 7.47" image="" halign="right" valign="center"/>
 			</frame>
-			<frame id="framefooter" pos="0 -160.50">
+			<frame id="framefooter" pos="0 -160.50" z-index="1">
 				<frame z-index="0">
 					<quad z-index="0" size="94 24" halign="center" valign="bottom" style="Bgs1" substyle="BgDialogBlur" opacity="0.35"	pos="0 0"/>
 					<quad z-index="1" size="94 24" halign="center" valign="bottom" bgcolor="0b081b" opacity="0.98" />
@@ -149,7 +143,7 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 					<label pos="0 8" size="10 10" z-index="2" halign="center" valign="center2" text="🔎" scriptevents="1" id="pager_findplayer"	focusareacolor1="0000" focusareacolor2="0000" textsize="5"/>
 				</frame>
 			</frame>
-			<frame id="frametable" pos="0 -49">
+			<frame id="frametable" pos="0 -49" z-index="1">
 				<frameinstance id="framecolumnheader#1" modelid="framemodelcolumnheader" pos="-95.9 1.4" z-index="-1" />
 				<frameinstance id="framelegends#1" modelid="framemodellegends" pos="-99.70"/>
 				<frameinstance id="scorecard#0" modelid="framemodelscorecard" pos="-99.70 -0.00" />
@@ -176,18 +170,25 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 				declare Integer LatestSpecUpdate = 0;
 				declare Integer LatestScoreTableUpdate = 0;
 				declare Integer PageIndex = 0;
-				if (InputPlayer != Null) {
-					if (!InputPlayer.RequestsSpectate) PageIndex = Scores.keyof(InputPlayer.Score)/12;
-				}
+				declare Integer Blink = -1;
+				if ({{{EndRound}}}) Blink = Now;
 
 				// TODO: Load points array from xml
 				declare Integer[] PointsArray = [250, 225, 200, 180, 160, 150, 140, 135, 130, 125, 120, 116, 112, 108, 104, 100, 96, 92, 88, 84, 80, 77, 74, 71, 68, 65, 62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 				declare Integer PointsLast = 0;
 
 				declare CMlQuad quadPlayerAvatar <=> (Page.GetFirstChild("playerinfo_avatar") as CMlQuad);
-				declare CMlLabel lblPlayerRank <=> (Page.GetFirstChild("additionnalinfo_servername") as CMlLabel);
+				declare CMlLabel lblServerName <=> (Page.GetFirstChild("additionnalinfo_servername") as CMlLabel);
+				declare CMlLabel lblPageNumber <=> (Page.GetFirstChild("pager_number") as CMlLabel);
+				declare CMlLabel lblPlayerRank <=> (Page.GetFirstChild("playerinfo_rank") as CMlLabel);
 				quadPlayerAvatar.ImageUrl = "file://Avatars/"^LocalUser.Login^"/Default";
-				lblPlayerRank.Value = CurrentServerName;
+				lblServerName.Value = CurrentServerName;
+				if (InputPlayer != Null) {
+					if (!InputPlayer.RequestsSpectate) {
+						PageIndex = Scores.keyof(InputPlayer.Score)/12;
+						lblPageNumber.Value = TextLib::ToText(PageIndex+1);
+					}
+				}
 				while(True) {
 					foreach(Event in PendingEvents)	{
 						switch(Event.Type) {
@@ -205,21 +206,35 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 									ShowProfile(TargetProfile);
 								} else if (Event.ControlId == "pager_buttonprev") {
 									if (PageIndex < 1) continue;
-									declare CMlLabel lblPageNumber <=> (Page.GetFirstChild("pager_number") as CMlLabel);
 									PageIndex -= 1;
 									lblPageNumber.Value = TextLib::ToText(PageIndex+1);
+									LatestScoreTableUpdate = 0;
 								} else if (Event.ControlId == "pager_buttonnext") {
 									if ((PageIndex+1)*12 >= Scores.count) continue;
-									declare CMlLabel lblPageNumber <=> (Page.GetFirstChild("pager_number") as CMlLabel);
 									PageIndex += 1;
 									lblPageNumber.Value = TextLib::ToText(PageIndex+1);
+									LatestScoreTableUpdate = 0;
+								} else if (Event.ControlId == "pager_findplayer") {
+									PageIndex = Scores.keyof(InputPlayer.Score)/12;
+									lblPageNumber.Value = TextLib::ToText(PageIndex+1);
+									Blink = Now;
+									LatestScoreTableUpdate = 0;
+								}
+							}
+							case CMlEvent::Type::MouseOver: {
+								if (Event.ControlId == "pager_findplayer") {
+									(Event.Control as CMlLabel).TextColor = <0.8, 0.8, 0.8>;
+								}
+							}
+							case CMlEvent::Type::MouseOut: {
+								if (Event.ControlId == "pager_findplayer") {
+									(Event.Control as CMlLabel).TextColor = <1., 1., 1.>;
 								}
 							}
 						}
 					}
 
 					if (LatestScoreTableUpdate + {{{C_UITickPeriod}}} < Now) {
-						declare CMlLabel lblPlayerRank <=> (Page.GetFirstChild("playerinfo_rank") as CMlLabel);
 						if (InputPlayer != Null) lblPlayerRank.Value = "#"^(Scores.keyof(InputPlayer.Score)+1);
 						
 						foreach (Player in Players) { // (MP bug: not detecting fakeplayers when next map)
@@ -230,7 +245,6 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 							else if (!Player.IsSpawned) Status = 2;
 							else Status = 1;
 						}
-						LatestScoreTableUpdate = Now;
 
 						for(i, 0, 11) {
 							declare CMlFrame frmScoreCard <=> (Page.GetFirstChild("scorecard#"^i) as CMlFrame);
@@ -242,6 +256,7 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 								declare CMlLabel lblScore <=> (frmScoreCard.GetFirstChild("columns_labeltmpoints") as CMlLabel);
 								declare CMlQuad quadStatus <=> (frmScoreCard.GetFirstChild("scorecard_quadstatus") as CMlQuad);
 								declare CMlQuad quadSpec <=> (frmScoreCard.GetFirstChild("columns_quadspec") as CMlQuad);
+								declare CMlQuad quadBlink <=> (frmScoreCard.GetFirstChild("scorecard_quadbackgroundblink") as CMlQuad);
 								declare LastStatusUpdate for Scores[p].User = Now;
 								declare Status for Scores[p].User = 0;
 
@@ -276,6 +291,17 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 									}
 								}
 
+								if (Scores[p].User.Login == LocalUser.Login) {
+									if (Blink != -1 && Blink + 1500 > Now) {
+										quadBlink.Show();
+									} else {
+										Blink = -1;
+										quadBlink.Hide();
+									}
+								} else {
+									quadBlink.Hide();
+								}
+
 								// Constants
 								declare CMlLabel lblName <=> (frmScoreCard.GetFirstChild("columns_labelname") as CMlLabel);
 								if (lblName.Value != Scores[p].User.Name) {
@@ -301,7 +327,6 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 										declare CMlFrame frmPointsGain <=> (frmScoreCard.GetFirstChild("framepointsgain") as CMlFrame);
 										declare CMlLabel lblLpGain <=> (frmScoreCard.GetFirstChild("scorecard_labellpgain") as CMlLabel);
 										declare CMlLabel lblPointsGain <=> (frmScoreCard.GetFirstChild("scorecard_labelpointsgain") as CMlLabel);
-										declare CMlQuad quadBlink <=> (frmScoreCard.GetFirstChild("scorecard_quadbackgroundblink") as CMlQuad);
 										quadSpec.Hide();
 										if (Scores[p].Points != 0) {
 											frmLpGain.Show();
@@ -311,21 +336,17 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 												declare LadderPoints = "+0.00";
 												if (LadderPointsExplode.existskey(0)) LadderPoints = LadderPointsExplode[0];
 												if (LadderPointsExplode.existskey(1)) LadderPoints ^= "."^TextLib::SubString(LadderPointsExplode[1], 0, 2);
+												else LadderPoints ^= ".00";
 												if (Scores[p].LadderScore >= 0) lblLpGain.Value = "+"^LadderPoints;
 												else lblLpGain.Value = LadderPoints;
 											}
 											if (PointsArray.existskey(p)) lblPointsGain.Value = "+"^PointsArray[p];
 											else lblPointsGain.Value = "+"^PointsLast;
 										}
-										if (Scores[p].User.Login == LocalUser.Login) {
-											quadBlink.Show();
-										} else {
-											quadBlink.Hide();
-										}
 									}
 									for(j, 0, 4) {
 										declare CMlQuad quadStar <=> (frmScoreCard.GetFirstChild("columns_quadmaniastar"^j) as CMlQuad);
-										if (Scores[p].User.FameStars > j) {
+										if ((Scores[p].User.FameStars != 4 && Scores[p].User.FameStars > j) || (Scores[p].User.FameStars == 4 && j != 2)) {
 											quadStar.Show();
 										} else {
 											quadStar.Hide();
@@ -336,6 +357,7 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 								frmScoreCard.Hide();
 							}
 						}
+						LatestScoreTableUpdate = Now;
 					}
 
 					if (GUIPlayer != Null && (IsSpectatorMode) && LatestSpecUpdate + 1000 < Now) {
@@ -604,7 +626,7 @@ Text MLGet_Gui(Integer RankPanelType) {
 					if (Net_TimeDiffCT != 0 && Net_TimeDiffCT + 2000 > GameTime) {
 						TimeDiff.Show();
 						if (Net_TimeDiff < 0) {
-							TimeDiff.SetText("$00f-"^GetTime2(Net_TimeDiff));
+							TimeDiff.SetText("$00f"^GetTime2(Net_TimeDiff));
 						} else {
 							TimeDiff.SetText("$f00+"^GetTime2(Net_TimeDiff));
 						}
@@ -706,7 +728,8 @@ Text MLGet_Gui(Integer RankPanelType) {
 		<label text="$00f+0:00.00" posn="0 27.5 10" sizen="16 0" valign="center" halign="center" style="TextRaceChrono" textsize="4" id="TimeDiff"/>
 		<frame posn="0 -75 1" id="PlayingButton">
 			<quad style="Icons64x64_1" substyle="LvlGreen" sizen="7 7" posn="-13 0 31" valign="center" id="_ReadyIcon" halign="center"/>
-			<label text="    Playing" posn="0 0 30" valign="center" halign="center" style="CardButtonMedium" id="_Ready" scriptevents="1"/>
+			<label text="    Playing" valign="center" halign="center" style="TextButtonNav"/>
+			<quad valign="center" halign="center" sizen="40 8" style="BgsPlayerCard" substyle="BgPlayerCardSmall" id="_Ready" scriptevents="1"/>
 		</frame>
 		""";
 		ML ^= """
@@ -791,7 +814,13 @@ Void ResetAll() {
 	}
 }
 
+Void Synchro() {
+	declare Barrier = Synchro_AddBarrier();
+	while (!Synchro_BarrierReached(Barrier) && !ServerShutdownRequested) yield;
+}
+
 Void WaitPass(Integer TimePass) {
+	Synchro();
 	while (TimePass > Now) {
 		foreach (E in PendingEvents) {
 			switch (E.Type) {
@@ -805,11 +834,6 @@ Void WaitPass(Integer TimePass) {
 		}
 		yield;
 	}
-}
-
-Void Synchro() {
-	declare Barrier = Synchro_AddBarrier();
-	while (!Synchro_BarrierReached(Barrier) && !ServerShutdownRequested) yield;
 }
 
 main() {
@@ -826,7 +850,9 @@ main() {
 	ModeInfo::SetStatusMessage(StatusMessage);
 
 	declare netwrite version for XmlRpc = Version;
+	version = Version;
 	declare netwrite enduro_scores for XmlRpc = "";
+	enduro_scores = "";
 	declare netread decreaser for XmlRpc = TimeMargeP2;
 	declare netread Boolean last_round for XmlRpc = False;
 	IndependantLaps = False;
@@ -995,9 +1021,7 @@ main() {
 		declare Boolean winner = False;
 		UIManager.UIAll.BigMessage = "";
 		UIManager.UIAll.StatusMessage = "Synchronization...";
-		sleep(100);
 		Synchro();
-		
 		if (!MatchEndRequested && !ServerShutdownRequested) {
 			UIManager.UIAll.StatusMessage = "Starting...";
 			Scores_Clear();
@@ -1026,7 +1050,6 @@ main() {
 				Net_State = 1;
 			}
 
-			sleep(UnfollowSpawnSyncTime); // Give time to client to unfollow other player before spawning in order to follow client player (MP bug)
 			if (last_round == True)
 				ThrowMsgAll("$z$w$s$F00LIVE! $z$s$2c2LAST ROUND has started, GLHF!", True);
 			else
@@ -1219,7 +1242,6 @@ main() {
 					}
 				}
 				if (MatchEndRequested) {
-					Synchro();
 					break;
 				}
 
@@ -1290,12 +1312,10 @@ main() {
 							ThrowMsgAll(Player.User.Name^"$z$2c2$s wins this round!", True);
 							winner = True;
 							// XmlRpc.SendCallback("Endurance.Winner", """{"Login":"{{{Player.User.Login}}}"}""");
-							Synchro();
 							break;
 						}
 					}
 				} else if (PlayersRacing.count == 0) { // if somehow all players quit not triggering the MatchEnd
-					Synchro();
 					break;
 				}
 				
@@ -1303,11 +1323,24 @@ main() {
 					Scores_Sort(CTmMode::ETmScoreSortOrder::TotalPoints);
 					LastUIUpdateTime = Now;
 
+					declare UsedLayers = Ident[];
+
 					foreach (Player in AllPlayers) {
 						if (!Players.exists(Player))
 							Player.Score.Points = 0;
 						declare UI <=> UIManager.GetUI(Player);
 						if (UI == Null) continue;
+
+						declare CUILayer LayerLocal;
+						if (UI.UILayers.count != 1) {
+							UI.UILayers.clear();
+							LayerLocal <=> UIManager.UILayerCreate();
+							LayerLocal.Type = CUILayer::EUILayerType::Normal;
+							UI.UILayers.add(LayerLocal);
+						} else {
+							LayerLocal <=> UI.UILayers[0];
+						}
+						UsedLayers.add(LayerLocal.Id);
 
 						if (Player.RaceStartTime == 0) {
 							declare netread Net_SpecTargetReq for UI = "";
@@ -1329,6 +1362,17 @@ main() {
 							}
 						}
 					}
+					declare LayersToRemove = Ident[];
+					foreach (Layer in UIManager.UIAll.UILayers) { UsedLayers.add(Layer.Id); }
+					UsedLayers.add(LayerScoresTable.Id);
+					foreach (Layer in UIManager.UILayers) {
+						if (!UsedLayers.exists(Layer.Id)) {
+							LayersToRemove.add(Layer.Id);
+						}
+					}
+					foreach (LayerId in LayersToRemove) { // Removing layers that are not being used!
+						UIManager.UILayerDestroy(UIManager.UILayers[LayerId]);
+					}
 				}
 			}
 			UIManager.UIAll.StatusMessage = "";
@@ -1346,17 +1390,6 @@ main() {
 
 			// XmlRpc.SendCallback("Endurance.RoundEnded", """{}""");
 		}
-		// declare Text Output = "{";
-		// foreach (Score in Scores) {
-			// if (Score.Points != 0) {
-				// if (Output != "{") 
-					// Output ^= ",";
-				// if (Score.Points == StillRacingScore)
-					// Output ^= "\""^Score.User.Login^"\":-1";
-				// else
-					// Output ^= "\""^Score.User.Login^"\":"^StillRacingScore+Score.Points;
-			// }
-		// }
 		// XmlRpc.SendCallback("Endurance.MatchEnded", "{\"MatchTime\":"^Now-MatchStartTime^",\"Scores\":"^Output^"}}");
 		foreach (Player in AllPlayers)
 			Player.RaceStartTime = 0;
@@ -1390,7 +1423,7 @@ main() {
 				WaitPass(CutOffTimeLimit);
 			}
 		}
-		
+
 		UIManager.UIAll.UILayers.clear();	
 		UIManager.UIAll.UISequence = CUIConfig::EUISequence::None;	
 		UIManager.UIAll.StatusMessage = "Please wait...";
@@ -1399,9 +1432,7 @@ main() {
 			if (UI == Null) continue;
 			UI.UISequence = CUIConfig::EUISequence::None;	
 		}
-		
-		Synchro();
-		
+
 		RequestUnloadMap();
 		wait(!MapLoaded);
 	}

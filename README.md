@@ -62,6 +62,8 @@ The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_e
 
 /kickall [Kick all players except admins and whitelisted players] (ADMIN)
 
+/save [Save current total points in a CSV file] (ADMIN)
+
 /setrounds [Set the amount of enduro rounds (default: 3)] (ADMIN)
 
 /setmaps [Set the amount of enduro maps (default: 1)] (ADMIN)
