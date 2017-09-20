@@ -8,7 +8,7 @@ Works in MP4 with XAseco2.
 
 Support for: `EnduroCup.Script.txt` & `TimeAttack.Script.txt`
 
-Features: Local records + Total points system
+Features: Total points system, local records, control EnduroCup settings in-game, extra commands.
 
 ## Warning
 
@@ -20,17 +20,18 @@ Place the plugin file in the XAseco2 plugin folder and the script in the Scripts
 
 Edit your `plugins.xml` of XAseco2:
 
-Remove:
+To make the plugin work, comment/remove these plugins:
 
 ```xml
 <plugin>plugin.checkpoints.php</plugin>
 <plugin>plugin.dedimania.php</plugin>
 <plugin>chat.dedimania.php</plugin>
+<plugin>chat.me.php</plugin>
 ```
 
-(And any other plugins depended on these)
+(And any other plugins depending on these)
 
-Replace:
+And replace:
 
 ```xml
 <plugin>plugin.records_eyepiece.php</plugin>
@@ -54,6 +55,12 @@ The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_e
 
 /points [Show points system]
 
+/setrounds [Set the amount of enduro rounds (default: 3)] (ADMIN)
+
+/setmaps [Set the amount of enduro maps (default: 1)] (ADMIN)
+
+/setdecreaser [Set multiplication per CP (default: 0.95)] (ADMIN)
+
 /switch [Switch to another script] (ADMIN)
 
 /resetpoints [Reset total points] (ADMIN)
@@ -62,12 +69,12 @@ The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_e
 
 /kickall [Kick all players except admins and whitelisted players] (ADMIN)
 
-/save [Save current total points in a CSV file] (ADMIN)
+/muteall [Mute public chat] (ADMIN)
 
-/setrounds [Set the amount of enduro rounds (default: 3)] (ADMIN)
+/unmuteall [Unmute public chat] (ADMIN)
 
-/setmaps [Set the amount of enduro maps (default: 1)] (ADMIN)
+/save [Save current total points in the CSV file] (ADMIN)
 
-/setdecreaser [Set multiplication per CP (default: 0.95)] (ADMIN)
+/remove [Remove last total points in the CSV file] (ADMIN)
 
-/fakeplayer [Connect/disconnect fakeplayer(s)] (ADMIN)(DEBUG)
+/fakeplayer [Connect/disconnect/simulate fakeplayer(s)] (ADMIN)(DEBUG)

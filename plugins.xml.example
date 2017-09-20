@@ -3,7 +3,6 @@
 	<plugin>plugin.localdatabase.php</plugin>
 	<plugin>chat.admin.php</plugin>
 	<plugin>chat.help.php</plugin>
-	<plugin>chat.me.php</plugin>
 	<plugin>plugin.mxinfo.php</plugin>
 	<plugin>plugin.map.php</plugin>
 	<plugin>plugin.chatlog.php</plugin>
