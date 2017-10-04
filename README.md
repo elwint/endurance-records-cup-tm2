@@ -73,8 +73,8 @@ The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_e
 
 /unmuteall [Unmute public chat] (ADMIN)
 
-/save [Save current total points in the CSV file] (ADMIN)
+/save [Save current (total) points in the CSV file] (ADMIN)
 
-/remove [Remove last total points in the CSV file] (ADMIN)
+/remove [Remove last (total) points in the CSV file] (ADMIN)
 
 /fakeplayer [Connect/disconnect/simulate fakeplayer(s)] (ADMIN)(DEBUG)

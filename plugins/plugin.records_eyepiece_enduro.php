@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V5.0";
+$enduro_version = "V5.1";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,7 +15,7 @@ $enduro_version = "V5.0";
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (05-2017)
+ * Modified by: Virtex (fsxelw) (10-2017)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -234,8 +234,8 @@ Aseco::addChatCommand('whitelist', 'Manage whitelist');
 Aseco::addChatCommand('kickall', 'Kick all players except admins and whitelisted players');
 Aseco::addChatCommand('muteall', 'Mute public chat');
 Aseco::addChatCommand('unmuteall', 'Unmute public chat');
-Aseco::addChatCommand('save', 'Save current total points in the CSV file');
-Aseco::addChatCommand('remove', 'Remove last total points in the CSV file');
+Aseco::addChatCommand('save', 'Save current (total) points in the CSV file');
+Aseco::addChatCommand('remove', 'Remove last (total) points in the CSV file');
 
 Aseco::addChatCommand('fakeplayer', 'Connect/disconnect/simulate fakeplayer(s)');
 
@@ -315,6 +315,9 @@ function re_onSync ($aseco, $reload = null) {
 	if (!isset($re_config['ENDURO_CUP'][0]['WHITELIST'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "whitelist" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
+	if (!isset($re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0])) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "save_total_points" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+	}
 	if (!isset($re_config['ENDURO_CUP'][0]['SAVE_CSV'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "save_csv" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
@@ -324,6 +327,7 @@ function re_onSync ($aseco, $reload = null) {
 	}
 	
 	// Transform 'TRUE' or 'FALSE' from string to boolean
+	$re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0] = ((strtoupper($re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0]) == 'TRUE') ? true : false);
 	$re_config['MAP_WIDGET'][0]['ENABLED'][0]					= ((strtoupper($re_config['MAP_WIDGET'][0]['ENABLED'][0]) == 'TRUE')					? true : false);
 	$re_config['WELCOME_WINDOW'][0]['ENABLED'][0]					= ((strtoupper($re_config['WELCOME_WINDOW'][0]['ENABLED'][0]) == 'TRUE')				? true : false);
 	$re_config['WELCOME_WINDOW'][0]['HIDE'][0]['RANKED_PLAYER'][0]			= ((strtoupper($re_config['WELCOME_WINDOW'][0]['HIDE'][0]['RANKED_PLAYER'][0]) == 'TRUE')		? true : false);
@@ -17698,14 +17702,17 @@ function re_handleSpecialChars ($string, $xml=true) {
 	return validateUTF8String($string);	// validateUTF8String() from basic.inc.php
 }
 
+function show_error($login, $error, $log=false) {
+	global $aseco;
+	$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}'.$error), $login);
+	if ($log) trigger_error('[plugin.records_eyepiece_enduro.php] '.$error, E_USER_WARNING);
+}
+
 function chat_setrounds($aseco, $command) {
 	global $rounds, $roundsdone;
-	
-	$admin = $command['author'];
-	$login = $admin->login;
-		
+
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17729,12 +17736,9 @@ function chat_setrounds($aseco, $command) {
 
 function chat_setmaps($aseco, $command) {
 	global $maps;
-	
-	$admin = $command['author'];
-	$login = $admin->login;
-		
+
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17752,31 +17756,28 @@ function chat_setmaps($aseco, $command) {
 
 function chat_switch($aseco, $command) {
 	global $enduro, $decreaser;
-	
-	$admin = $command['author'];
-	$login = $admin->login;
-		
+
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 	
 	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
 	if (empty($command['params'][1]) || ($command['params'][0] != "res" && $command['params'][0] != "next")) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Usage: /switch (res|next) <script name>'), $login);
+		show_error($command['author']->login, 'Usage: /switch (res|next) <script name>');
 		return;
 	}
 	
 	$aseco->client->query('GetScriptName');
 	$dat = $aseco->client->getResponse();
 	if (strpos(mb_strtolower($dat['CurrentValue']), mb_strtolower($command['params'][1]) . '.script.txt') !== false) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Can\'t switch to the same script!'), $login);
+		show_error($command['author']->login, 'Can\'t switch to the same script!');
         return;
 	}
 	
 	$a = $aseco->client->query('SetScriptName', $command['params'][1]);
 	if ($a != true) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Invalid script!'), $login);
+		show_error($command['author']->login, 'Invalid script!');
         return;
 	}
 	
@@ -17798,11 +17799,8 @@ function chat_switch($aseco, $command) {
 function chat_resetpoints($aseco, $command) {
 	global $re_config;
 
-	$admin = $command['author'];
-	$login = $admin->login;
-		
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17816,17 +17814,14 @@ function chat_resetpoints($aseco, $command) {
 }
 
 function chat_fakeplayer($aseco, $command) {
-	$admin = $command['author'];
-	$login = $admin->login;
-		
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
 	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
 	if (!isset($command['params'][1]) || ($command['params'][0] != "con" && $command['params'][0] != "dis" && $command['params'][0] != "sim")) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Usage: /fakeplayer (con|dis|sim) (<con_amount>|<dis_login>|<sim_cptime>)'), $login);
+		show_error($command['author']->login, 'Usage: /fakeplayer (con|dis|sim) (<con_amount>|<dis_login>|<sim_cptime>)');
         return;
 	}
 
@@ -17838,31 +17833,27 @@ function chat_fakeplayer($aseco, $command) {
 	} else {
 		$a = $aseco->client->query('SetModeScriptVariables', array('sim_cptime' => (int)$command['params'][1]));
 		if ($a != true) {
-			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Can\'t set simulate fakeplayer CP time value!'), $login);
+			show_error($command['author']->login, 'Can\'t set simulate fakeplayer CP time value!');
 			return;
 		}
-		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zSimulate fakeplayer CP time set to: $FFF' . (int)$command['params'][1]), $login);
-		$aseco->console('Simulate fakeplayer CP time set to: ' . $decreaser);
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zSimulate fakeplayer CP time set to: $FFF' . (int)$command['params'][1]), $command['author']->login);
+		$aseco->console('Simulate fakeplayer CP time set to: ' . (int)$command['params'][1]);
 	}
 }
 
 function chat_points($aseco, $command) {
 	global $re_config;
-	
-	$login = $command['author']->login;
+
 	$enduro_points = explode(",",$re_config['ENDURO_CUP'][0]['POINTS'][0]);
 	$enduro_points_last = (int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0];
-	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEnduroCup points system: $FFF' . join(', ', $enduro_points) . ', ' . $enduro_points_last . '...'), $login);
+	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zEnduroCup points system: $FFF' . join(', ', $enduro_points) . ', ' . $enduro_points_last . '...'), $command['author']->login);
 }
 
 function chat_setdecreaser($aseco, $command) {
 	global $decreaser;
-	
-	$admin = $command['author'];
-	$login = $admin->login;
-	
+
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17870,7 +17861,7 @@ function chat_setdecreaser($aseco, $command) {
 	if (isset($command['params'][0])) {
 		$a = $aseco->client->query('SetModeScriptVariables', array('decreaser' => floatval($command['params'][0])));
 		if ($a != true) {
-			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Can\'t set decreaser value!'), $login);
+			show_error($command['author']->login, 'Can\'t set decreaser value!');
 			return;
 		}
 		$decreaser = floatval($command['params'][0]);
@@ -17883,11 +17874,8 @@ function chat_setdecreaser($aseco, $command) {
 function chat_kickall($aseco, $command) {
 	global $whitelist;
 
-	$admin = $command['author'];
-	$login = $admin->login;
-
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17900,41 +17888,38 @@ function chat_kickall($aseco, $command) {
 function chat_whitelist($aseco, $command) {
 	global $whitelist, $re_config;
 
-	$admin = $command['author'];
-	$login = $admin->login;
-		
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
 	$command['params'] = explode(' ', preg_replace('/ +/', ' ', $command['params']));
 	if ($command['params'][0] != "clear" && (empty($command['params'][1]) || ($command['params'][0] != "add" && $command['params'][0] != "remove"))) {
-		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zUsage: /whitelist (add|remove|clear) <player_login>'), $login);
-		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zWhitelisted logins: ' . join('; ', $whitelist)), $login);
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zUsage: /whitelist (add|remove|clear) <player_login>'), $command['author']->login);
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zWhitelisted logins: ' . join('; ', $whitelist)), $command['author']->login);
         return;
 	}
 
 	if ($command['params'][0] == "add") {
 		if (in_array($command['params'][1], $whitelist)) {
-			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Player login already in whitelist!'), $login);
+			show_error($command['author']->login, 'Player login already in whitelist!');
 			return;
 		} else {
 			$whitelist[] = $command['params'][1];
-			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zPlayer "'.$command['params'][1].'" added to whitelist'), $login);
+			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zPlayer "'.$command['params'][1].'" added to whitelist'), $command['author']->login);
 		}
 	} elseif ($command['params'][0] == "remove") {
 		if (in_array($command['params'][1], $whitelist)) {
 			$key = array_search($command['params'][1], $whitelist);
 			unset($whitelist[$key]);
-			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zPlayer "'.$command['params'][1].'" removed from whitelist'), $login);
+			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zPlayer "'.$command['params'][1].'" removed from whitelist'), $command['author']->login);
 		} else {
-			$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}Player login not in whitelist!'), $login);
+			show_error($command['author']->login, 'Player login not in whitelist!');
 			return;
 		}
 	} else {
 		$whitelist = array();
-		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zWhitelist cleared'), $login);
+		$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zWhitelist cleared'), $command['author']->login);
 	}
 
 	// Update whitelist file
@@ -17945,11 +17930,8 @@ function chat_whitelist($aseco, $command) {
 function chat_muteall($aseco, $command) {
 	global $chat_mute_all;
 
-	$admin = $command['author'];
-	$login = $admin->login;
-
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17962,11 +17944,8 @@ function chat_muteall($aseco, $command) {
 function chat_unmuteall($aseco, $command) {
 	global $chat_mute_all;
 
-	$admin = $command['author'];
-	$login = $admin->login;
-
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
@@ -17987,128 +17966,149 @@ function re_onChat($aseco, $chat) {
 function chat_save($aseco, $command) {
 	global $re_config, $enduro_total_points;
 
-	$admin = $command['author'];
-	$login = $admin->login;
-
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
 	$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
-	$error = false;
+	$save_total_points = $re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0];
+	if ($save_total_points) {
+		$type_points = "Total points";
+	} else {
+		$enduro_points = explode(",",$re_config['ENDURO_CUP'][0]['POINTS'][0]);
+		$type_points = "Points (according to rounds points)";
+	}
+
 	if (!file_exists($csv_file)) {
 		$w = file_put_contents($csv_file, "\xEF\xBB\xBFnickname;login;total_points;best_total_points"); // With UTF-8 BOM
-		if ($w === false) $error = "Can't create ".$csv_file;
+		if ($w === false) {
+			show_error($command['author']->login, "Can't create ".$csv_file, true);
+			return;
+		}
 	}
 
 	$new_csv = array(); // Performance can be improved by writing to a new file instead of using another array.
-	if (!$error) {
-		if (($handle = fopen($csv_file, 'r')) !== false) {
-			$header = fgetcsv($handle, 1000, ";");
-			if ($header[0] != "\xEF\xBB\xBFnickname" || $header[1] != "login" || end($header) != "best_total_points") {
-				trigger_error('[plugin.records_eyepiece_enduro.php] Invalid CSV format, created new one automatically', E_USER_WARNING);
-				fclose($handle);
-				if (rename($csv_file, $csv_file.'.old') !== false) {
-					chat_save($aseco, $command);
-				}
-				return;
-			}
-			$number = count($header)-3;
-			array_splice($header, -2, 0, array("#".$number));
-			$new_csv[] = $header;
-			$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zSaving total points (#'.$number.')...'), $login);
-			$csv_points = array();
-			while (($data = fgetcsv($handle, 1000, ";")) !== false) {
-				$csv_points[$data[1]] = array_slice($data, 0, -2);
-			}
-			fclose($handle);
-		} else {
-			$error = "Can't open read ".$csv_file;
+
+	if (($handle_read = fopen($csv_file,'r')) === false) {
+		show_error($command['author']->login, "No read ".$csv_file." access", true);
+		return;
+	}
+	$header = fgetcsv($handle_read, 1000, ";");
+	if ($header[0] != "\xEF\xBB\xBFnickname" || $header[1] != "login" || end($header) != "best_total_points") {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Invalid CSV format, created new one automatically', E_USER_WARNING);
+		fclose($handle_read);
+		if (rename($csv_file, $csv_file.'.old') !== false) {
+			chat_save($aseco, $command);
 		}
+		return;
+	}
+	if (($handle_write = fopen($csv_file.'.temp','w')) === false) {
+		show_error($command['author']->login, "No write ".$csv_file.".temp access", true);
+		fclose($handle_read);
+		return;
+	}
+	$number = count($header)-3;
+	array_splice($header, -2, 0, array("#".$number));
+	fputcsv($handle_write, $header, ";");
+	$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zSaving '.$type_points.' (#'.$number.')...'), $command['author']->login);
+	$csv_points = array();
+	while (($data = fgetcsv($handle_read, 1000, ";")) !== false) {
+		$csv_points[$data[1]] = array_slice($data, 0, -2);
+	}
+	fclose($handle_read);
+
+	$i = 0;
+	foreach ($enduro_total_points as $plogin => &$pdata) { // Overwrite, new sortation
+		$pnickname = re_handleSpecialChars(stripColors($pdata['name']), false);
+		if (isset($csv_points[$plogin])) {
+			$data = &$csv_points[$plogin];
+			$data[0] = $pnickname;
+		} else { // New player
+			$data = array($pnickname, $plogin);
+			for ($j = 1; $j < $number; $j++) {
+				$data[] = "-";
+			}
+		}
+		if ($save_total_points) {
+			$data[] = $pdata['points'];
+		} else {
+			if (isset($enduro_points[$i])) {
+				$points = (int)$enduro_points[$i];
+				$i++;
+			} else {
+				$points = (int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0];
+			}
+			$data[] = $points;
+		}
+		calculate_total_and_best_points($data, $number);
+		fputcsv($handle_write, $data, ";");
+		unset($csv_points[$plogin]);
 	}
 
-	if (!$error) {
-		foreach ($enduro_total_points as $plogin => &$pdata) { // Overwrite, new sortation
-			$pnickname = re_handleSpecialChars(stripColors($pdata['name']), false);
-			if (isset($csv_points[$plogin])) {
-				$data = &$csv_points[$plogin];
-				$data[0] = $pnickname;
-				$data[] = $pdata['points'];
-				calculate_total_and_best_points($data, $number);
-				$new_csv[] = $data;
-				unset($csv_points[$plogin]);
-			} else { // New player
-				$data = array($pnickname, $plogin);
-				for ($j = 1; $j < $number; $j++) {
-					$data[] = "-";
-				}
-				$data[] = $pdata['points'];
-				calculate_total_and_best_points($data, $number);
-				$new_csv[] = $data;
-			}
-		}
-
-		foreach ($csv_points as $key => &$data) { // Old player not participated
-			$data[] = "-";
-			calculate_total_and_best_points($data, $number);
-			$new_csv[] = $data;
-		}
-
-		if (($handle = fopen($csv_file, 'w')) !== false) {
-			foreach ($new_csv as $line) {
-			   $w = fputcsv($handle, $line, ";");
-			   if ($w === false) {
-				   $error = "Unable to write to ".$csv_file;
-				   break;
-			   }
-			}
-			fclose($handle);
-		} else {
-			$error = "Can't open write ".$csv_file;
-		}
+	foreach ($csv_points as $key => &$data) { // Old player not participated
+		$data[] = "-";
+		calculate_total_and_best_points($data, $number);
+		fputcsv($handle_write, $data, ";");
 	}
 
-	if ($error) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}'.$error), $login);
-		trigger_error('[plugin.records_eyepiece_enduro.php] '.$error, E_USER_WARNING);
+	fclose($handle_write);
+	if (rename($csv_file.'.temp',$csv_file) === false) {
+		show_error($command['author']->login, "No write ".$csv_file." access", true);
 	} else {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points for #'.$number.' has been saved'));
-		$aseco->console('Total points for #'.$number.' has been saved in ' . $csv_file);
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $z'.$type_points.' for #'.$number.' has been saved'));
+		$aseco->console($type_points.' for #'.$number.' has been saved in ' . $csv_file);
+	}
+}
+
+function remove_last_points() {
+	global $aseco, $re_config;
+
+	$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+	if (!file_exists($csv_file)) return;
+	if (($handle_read = fopen($csv_file,'r')) !== false && ($handle_write = fopen($csv_file.'.temp','w')) !== false) {
+		$header = fgetcsv($handle_read, 1000, ";");
+		$key = count($header)-3;
+		if ($key < 2) return;
+		unset($header[$key]);
+		fputcsv($handle_write, $header, ";");
+		while (($data = fgetcsv($handle_read, 1000, ";")) !== false){
+			$new_data = array_slice($data, 0, -2);
+			unset($new_data[$key]);
+			calculate_total_and_best_points($new_data, $key-2);
+			fputcsv($handle_write, $new_data, ";");
+		}
+		fclose($handle_read);
+		fclose($handle_write);
+		if (rename($csv_file.'.temp',$csv_file) !== false) {
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints of #'.($key-1).' has been removed'));
+			$aseco->console('Points of #'.($key-1).' has been removed in ' . $csv_file);
+		}
 	}
 }
 
 function chat_remove($aseco, $command) {
-	global $re_config, $enduro_total_points;
-
-	$admin = $command['author'];
-	$login = $admin->login;
+	global $confirm_func;
 
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
-		$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#error}You don\'t have the required admin rights to do that!'), $login);
+		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
-	$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
-	if (!file_exists($csv_file)) return;
-	$handle_read = fopen($csv_file,'r');
-	$handle_write = fopen($csv_file.'.temp','w');
-	$header = fgetcsv($handle_read, 1000, ";");
-	$key = count($header)-3;
-	if ($key < 2) return;
-	unset($header[$key]);
-	fputcsv($handle_write, $header, ";");
-	while (($data = fgetcsv($handle_read, 1000, ";")) !== false){
-		$new_data = array_slice($data, 0, -2);
-		unset($new_data[$key]);
-		calculate_total_and_best_points($new_data, $key-2);
-		fputcsv($handle_write, $new_data, ";");
+	$aseco->client->query('ChatSendToLogin', $aseco->formatColors('{#emotic}Are you sure you want to remove the last saved points? Type /y to confirm.'), $command['author']->login);
+	$confirm_func = array('remove_last_points', $command['author']->login, time());
+}
+
+function chat_y($aseco, $command) {
+	global $confirm_func;
+
+	if (isset($confirm_func)) {
+		if ($command['author']->login != $confirm_func[1]) return;
+		if ((time()-$confirm_func[2]) < 60) {
+			$confirm_func[0]();
+		}
+		unset($GLOBALS['confirm_func']);
 	}
-	fclose($handle_read);
-	fclose($handle_write);
-	rename($csv_file.'.temp',$csv_file);
-	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points for #'.($key-1).' has been removed'));
-	$aseco->console('Total points for #'.($key-1).' has been removed in ' . $csv_file);
 }
 
 function calculate_total_and_best_points(&$data, $size) {
