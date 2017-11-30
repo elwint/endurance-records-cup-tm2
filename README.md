@@ -1,6 +1,6 @@
 # EnduroCup script and XAseco2 plugin [TM2][MP4]
 
-![screenshot example](https://drive.google.com/uc?export=view&id=0B-t0hZwYZIWSVGpTc1B0QjNkdU0)
+![screenshot example](https://drive.google.com/uc?export=view&id=1iemqrSLBSlt_0stk6Fe0ifcz3ybUNOOX)
 
 ## Modified Records Eyepiece plugin
 
@@ -20,7 +20,7 @@ Place the plugin file in the XAseco2 plugin folder and the script in the Scripts
 
 Edit your `plugins.xml` of XAseco2:
 
-To make the plugin work, comment/remove these plugins:
+To make the plugin work properly, comment/remove these plugins:
 
 ```xml
 <plugin>plugin.checkpoints.php</plugin>

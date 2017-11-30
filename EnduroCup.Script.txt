@@ -1,7 +1,7 @@
 ﻿/*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduroCup by Virtex (fsxelw) (10-2017)
+Modified to EnduroCup by Virtex (fsxelw) (11-2017)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,11 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #Include "Libs/Nadeo/TrackMania/TM3.Script.txt" as TM
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
 #Include "Libs/Nadeo/ModeInfo.Script.txt" as ModeInfo
-#Const	Version				"V5.1-cup V1.4b-alpha"
+#Const	Version				"V5.2-cup V1.4b-alpha"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
-#Const WarmupTime 				10000	// WARMING UP TIME IN MS (1000 = 1 second)
+#Const WarmupTimeNewMap 		23000	// WARMING UP TIME FIRST ROUND IN MS (1000 = 1 second)
+#Const WarmupTime 				8000	// WARMING UP TIME IN MS (1000 = 1 second)
 #Const TimeMargeP1				30000   // START TIME MARGE
 #Const TimeMargeP2				0.95    // DEFAULT MULTIPLICATION PER CP (Generally <= 1.0)
 #Const RoundEndWait				5000	// WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
@@ -389,7 +390,7 @@ Text MLGet_Gui(Integer RankPanelType) {
 				return r;
 			}
 			Integer GetTopIndex(Integer CP) {
-				if (CP < 0) return -1;
+				if (CP < 0 || Scores.count == 0) return -1;
 				declare Integer Points = CP*1000+999;
 				if (Scores[0].Points == Points || Scores[0].Points == CP) return 0;
 				if (Scores[0].Points < Points) return -1;
@@ -410,10 +411,11 @@ Text MLGet_Gui(Integer RankPanelType) {
 			main () {
 				declare CMlFrame FrameTimer <=> (Page.GetFirstChild("FrameTimer") as CMlFrame);
 				declare CMlFrame PlayingButton <=> (Page.GetFirstChild("PlayingButton") as CMlFrame);
+				declare CMlFrame CPFrame <=> (Page.GetFirstChild("CPFrame") as CMlFrame);
 				declare CMlLabel LText <=> (Page.GetFirstChild("LText") as CMlLabel);
 				declare CMlLabel LTime <=> (Page.GetFirstChild("LTime") as CMlLabel);
-				declare CMlLabel Position <=> (Page.GetFirstChild("Position") as CMlLabel);
 				declare CMlLabel TimeDiff <=> (Page.GetFirstChild("TimeDiff") as CMlLabel);
+				declare CMlLabel CPLabel <=> (Page.GetFirstChild("CPLabel") as CMlLabel);
 				
 				declare LocalCP = 0;
 				declare netread Integer Net_State for UI;
@@ -431,15 +433,10 @@ Text MLGet_Gui(Integer RankPanelType) {
 				declare CMlLabel LDriversLeft <=> (Page.GetFirstChild("LDriversLeft") as CMlLabel);
 				""";
 				ML^= """
-				
-				declare CMlLabel End_Victory <=> (Page.GetFirstChild("End_Victory") as CMlLabel);
-				declare CMlLabel End_Knockout <=> (Page.GetFirstChild("End_Knockout") as CMlLabel);
 				declare CMlQuad ReadyIcon <=> (Page.GetFirstChild("_ReadyIcon") as CMlQuad);
 				
 				declare netread Integer Net_Victory for UI;
 				declare netread Integer Net_KnockOut for UI;
-				
-				declare netread Integer Net_Position for UI;
 				
 				declare netread Integer Net_TimeDiff for UI;
 				declare netread Integer Net_TimeDiffCT for UI;
@@ -470,7 +467,12 @@ Text MLGet_Gui(Integer RankPanelType) {
 						} else {
 							PlayingButton.Hide();
 						}
-						Position.SetText("$08f"^Net_Position);
+						if (IsSpectatorMode) {
+							CPFrame.Show();
+							CPLabel.SetText("$DDDCP: "^Net_CP);
+						} else {
+							CPFrame.Hide();
+						}
 						""";
 						if (RankPanelType == 1)
 							ML ^= """
@@ -556,16 +558,25 @@ Text MLGet_Gui(Integer RankPanelType) {
 						for (i, -2, 0) {
 							declare CMlLabel L <=> (Page.GetFirstChild("CPCL"^i) as CMlLabel);
 							declare CMlQuad Q <=> (Page.GetFirstChild("CPCQ"^i) as CMlQuad);
+							declare CMlQuad Q2 <=> (Page.GetFirstChild("CPCQ2"^i) as CMlQuad);
 							if (Net_ReachTimes.existskey(CP+i+1)) {
 								if ((Net_ReachTimes[CP+i+1]-GameTime) > 0) {
-									L.SetText("$f00$s"^(Net_ReachTimes[CP+i+1]-GameTime)/1000^"");
+									if (i==0) L.SetText("$f00$s"^(Net_ReachTimes[CP+i+1]-GameTime)/1000^"");
+									else L.SetText("$f60$s"^(Net_ReachTimes[CP+i+1]-GameTime)/1000^"");
 								} else {
 									L.SetText("$000$sXXX");
 								}
-								Q.Show();
+								if (i==0) {
+									Q.Show();
+									Q2.Hide();
+								} else {
+									Q2.Show();
+									Q.Hide();
+								}
 							} else {
 								L.SetText("");
 								Q.Hide();
+								Q2.Hide();
 							}
 						}""";
 						ML^="""
@@ -652,6 +663,10 @@ Text MLGet_Gui(Integer RankPanelType) {
 						UI.UISequence = CUIConfig::EUISequence::None;
 					}
 					if (Net_TimeDiffCT != 0 && Net_TimeDiffCT + 2000 > GameTime) {
+						if (IsSpectatorMode)
+							TimeDiff.PosnY = -66.;
+						else
+							TimeDiff.PosnY = 27.5;
 						TimeDiff.Show();
 						if (Net_TimeDiff < 0) {
 							TimeDiff.SetText("$00f"^GetTime2(Net_TimeDiff));
@@ -709,16 +724,19 @@ Text MLGet_Gui(Integer RankPanelType) {
 			<!--CPStates-->
 			
 			<quad bgcolor="f77" sizen="1 18" posn="150 20 2" valign="center" halign="center" id="CPCQ0"/>
-			<label text="$f00$s" style="TextPlayerCardScore" posn="151 20 3" valign="center" halign="left" scale="1.5" id="CPCL0"/>
+			<quad bgcolor="fa7" sizen="1 18" posn="150 20 2" valign="center" halign="center" id="CPCQ20"/>
+			<label text="$f60$s" style="TextPlayerCardScore" posn="151 20 3" valign="center" halign="left" scale="1.5" id="CPCL0"/>
 			
 			<quad bgcolor="f77" sizen="1 18" posn="150 0 2" valign="center" halign="center" id="CPCQ-1"/>
-			<label text="$f00$s" style="TextPlayerCardScore" posn="151 0 3" valign="center" halign="left" scale="1.5" id="CPCL-1"/>
+			<quad bgcolor="fa7" sizen="1 18" posn="150 0 2" valign="center" halign="center" id="CPCQ2-1"/>
+			<label text="$f60$s" style="TextPlayerCardScore" posn="151 0 3" valign="center" halign="left" scale="1.5" id="CPCL-1"/>
 			
 			<quad bgcolor="f77" sizen="1 18" posn="150 -20 2" valign="center" halign="center" id="CPCQ-2"/>
-			<label text="$f00$s" style="TextPlayerCardScore" posn="151 -20 3" valign="center" halign="left" scale="1.5" id="CPCL-2"/>
+			<quad bgcolor="fa7" sizen="1 18" posn="150 -20 2" valign="center" halign="center" id="CPCQ2-2"/>
+			<label text="$f60$s" style="TextPlayerCardScore" posn="151 -20 3" valign="center" halign="left" scale="1.5" id="CPCL-2"/>
 			
-			<label text="$s$i$08fDrivers left:" posn="153 -37 3" valign="center" halign="center" scale="0.45"/>
-			<label style="TextValueSmallSm" text="$3830$fff/$8880" posn="153 -40 3" valign="center" halign="center" scale="1" id="LDriversLeft"/>
+			<label text="$s$i$08fDrivers left:" posn="150 -34 3" valign="center" halign="center" scale="0.45"/>
+			<label style="TextValueSmallSm" text="$383999$fff/$888999" posn="150 -37 3" valign="center" halign="center" scale="1" id="LDriversLeft"/>
 			
 			<!--User Frames-->
 			""";
@@ -737,15 +755,16 @@ Text MLGet_Gui(Integer RankPanelType) {
 			<label text="$s$o$fffReach $f00CP 0$fff within..." posn="0 -3 5" valign="center" halign="center" scale="0.3" id="LText" style="TextRaceMessageBig"/>
 			<label text="$f000:00.000" posn="0 -8 5" valign="center" halign="center" style="TextRaceChrono" scale="0.8" id="LTime"/>
 		</frame>
-		<label text="$FB2$o$sVICTORY" scale="0" posn="0 110 10" valign="center" halign="center" textsize="10" id="End_Victory"/>
-		<label text="$f33$o$sKNOCKED OUT" scale="0" posn="0 110 10" valign="center" halign="center" textsize="7" id="End_Knockout"/>
 		
-		<label text="$08f0" posn="153 -48 10" valign="center" halign="right" style="TextRaceChrono" textsize="10" id="Position"/>
 		<label text="$00f+0:00.00" posn="0 27.5 10" sizen="16 0" valign="center" halign="center" style="TextRaceChrono" textsize="4" id="TimeDiff"/>
 		<frame posn="0 -75 1" id="PlayingButton">
 			<quad style="Icons64x64_1" substyle="LvlGreen" sizen="7 7" posn="-13 0 31" valign="center" id="_ReadyIcon" halign="center"/>
 			<label text="    Playing" valign="center" halign="center" style="TextButtonNav"/>
 			<quad valign="center" halign="center" sizen="40 8" style="BgsPlayerCard" substyle="BgPlayerCardSmall" id="_Ready" scriptevents="1"/>
+		</frame>
+		<frame posn="125 -71 1" id="CPFrame">
+			<label posn="8 -1.2 0" halign="center" size="14 5" text="$DDDCP: 0" textsize="2.5" style="TextRaceChrono" id="CPLabel"/>
+			<quad sizen="16 6" style="EnergyBar" substyle="BgText"/>
 		</frame>
 		""";
 		ML ^= """
@@ -804,8 +823,6 @@ Void ResetAll() {
 		Net_Victory = 0;
 		declare netwrite Integer Net_KnockOut for UI;
 		Net_KnockOut = 0;
-		declare netwrite Integer Net_Position for UI;
-		Net_Position = 1;
 	}
 	foreach (Player in AllPlayers) {
 		declare UI <=> UIManager.GetUI(Player);
@@ -899,7 +916,7 @@ main() {
 			if (UI == Null) continue;
 			UI.ForceSpectator = False;
 		}
-		Synchro();
+		Synchro(); // Somehow this fixes the random warmup spec bug
 		UIManager.UIAll.StatusMessage = "Please wait...";
 		ResetAll();
 		ReachCP = 0;
@@ -952,8 +969,6 @@ main() {
 				CPScore = CP;
 				declare netwrite Integer Net_ReachCP for UI;
 				Net_ReachCP = 0;
-				declare netwrite Integer Net_Position for UI;
-				Net_Position = 0;
 				declare netwrite Integer Net_DriversLeft for UI;
 				Net_DriversLeft = 0;
 				declare netwrite Integer Net_DriversTotal for UI;
@@ -975,14 +990,21 @@ main() {
 				Player.RaceStartTime = Now+3000;
 				declare UI <=> UIManager.GetUI(Player);
 				if (UI == Null) continue;
-				ThrowMsg(UI, "$2c2"^(WarmupTime/1000)^" seconds warming up", False);
+				if (new_map)
+					ThrowMsg(UI, "$2c2"^(WarmupTimeNewMap/1000)^" seconds warming up (first round)", False);
+				else
+					ThrowMsg(UI, "$2c2"^(WarmupTime/1000)^" seconds warming up", False);
 			}
 			if (CtHideWarmingUpStatus) {
 				UIManager.UIAll.StatusMessage = "";
 				if (!CtPermitStarting || Players.count < PlayersReq)
 					StartingAt = 0;
-				else if (StartingAt == 0)
-					StartingAt = Now+WarmupTime;
+				else if (StartingAt == 0) {
+					if (new_map)
+						StartingAt = Now+WarmupTimeNewMap;
+					else
+						StartingAt = Now+WarmupTime;
+				}
 			} else {
 				if (!CtPermitStarting) {
 					UIManager.UIAll.StatusMessage = "Match start prohibited.";
@@ -991,8 +1013,12 @@ main() {
 					UIManager.UIAll.StatusMessage = "At least "^PlayersReq^" players required to start. ("^PlayersRacing.count^"/"^PlayersReq^")";
 					StartingAt = 0;
 				} else {
-					if (StartingAt == 0)
-						StartingAt = Now+WarmupTime;
+					if (StartingAt == 0) {
+						if (new_map)
+							StartingAt = Now+WarmupTimeNewMap;
+						else
+							StartingAt = Now+WarmupTime;
+					}
 					UIManager.UIAll.StatusMessage = "Starting in "^(StartingAt-Now)/1000^" seconds...";
 				}
 			}
@@ -1090,8 +1116,6 @@ main() {
 				Net_Victory = 0;
 				declare netwrite Integer Net_KnockOut for UI;
 				Net_KnockOut = 0;
-				declare netwrite Integer Net_Position for UI;
-				Net_Position = 1;
 				Player.Score.Clear();
 				if (Players.exists(Player)) {
 					Player.RaceStartTime = Now+5000;
@@ -1137,8 +1161,6 @@ main() {
 						CPScore = CP;
 						if (!PlayersReached.existskey(CP)) PlayersReached[CP] = 0;
 						PlayersReached[CP] = PlayersReached[CP] + 1;
-						declare netwrite Integer Net_Position for UI;
-						Net_Position = PlayersReached[CP];
 
 						declare netwrite Integer Net_CP for UI;
 						Net_CP = CP;
@@ -1191,8 +1213,6 @@ main() {
 							CPScore = CP;
 							if (!PlayersReached.existskey(CP)) PlayersReached[CP] = 0;
 							PlayersReached[CP] = PlayersReached[CP] + 1;
-							declare netwrite Integer Net_Position for UI;
-							Net_Position = PlayersReached[CP];
 
 							declare netwrite Integer Net_CP for UI;
 							Net_CP = CP;
@@ -1374,9 +1394,12 @@ main() {
 									declare netwrite Integer Net_CP as Net_CP1 for UI;
 									declare netwrite Integer Net_CP as Net_CP2 for UI2;
 									Net_CP1 = Net_CP2;
-									declare netwrite Integer Net_Position as Net_Position1 for UI;
-									declare netwrite Integer Net_Position as Net_Position2 for UI2;
-									Net_Position1 = Net_Position2;
+									declare netwrite Integer Net_TimeDiff as Net_TimeDiff1 for UI;
+									declare netwrite Integer Net_TimeDiff as Net_TimeDiff2 for UI2;
+									Net_TimeDiff1 = Net_TimeDiff2;
+									declare netwrite Integer Net_TimeDiffCT as Net_TimeDiffCT1 for UI;
+									declare netwrite Integer Net_TimeDiffCT as Net_TimeDiffCT2 for UI2;
+									Net_TimeDiffCT1 = Net_TimeDiffCT2;
 									declare netwrite Integer Net_AfterCPTimeLeft as Net_AfterCPTimeLeft1 for UI;
 									declare netwrite Integer Net_AfterCPTimeLeft as Net_AfterCPTimeLeft2 for UI2;
 									Net_AfterCPTimeLeft1 = Net_AfterCPTimeLeft2;

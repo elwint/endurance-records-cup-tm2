@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V5.1";
+$enduro_version = "V5.2";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,7 +15,7 @@ $enduro_version = "V5.1";
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (10-2017)
+ * Modified by: Virtex (fsxelw) (11-2017)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -8064,77 +8064,19 @@ function re_getLiveRankings ($gamemode) {
 	if (count($enduro_total_points) > 0) {
 		// Clean before filling
 		$re_scores['LiveRankings'] = array();
-		$re_cache['CurrentRankings'] = array();
 		$i = 0;
 		foreach ($enduro_total_points as $login => &$data) {
-			$re_cache['CurrentRankings'][$i]['BestTime'] = 0;
-			$re_cache['CurrentRankings'][$i]['Score'] = $data['points'];
-			$re_cache['CurrentRankings'][$i]['Login'] = $login;
-			$re_cache['CurrentRankings'][$i]['NickName'] = $data['name'];
-
-			if ( ($re_cache['CurrentRankings'][$i]['BestTime'] > 0) || ($re_cache['CurrentRankings'][$i]['Score'] >= 0) ) {
-				$re_scores['LiveRankings'][$i]['rank']		= ($i+1);
-				$re_scores['LiveRankings'][$i]['login']		= $re_cache['CurrentRankings'][$i]['Login'];
-				$re_scores['LiveRankings'][$i]['nickname']	= re_handleSpecialChars($re_cache['CurrentRankings'][$i]['NickName']);
-				if ($gamemode == Gameinfo::RNDS) {
-					$re_scores['LiveRankings'][$i]['score'] = re_formatTime($re_cache['CurrentRankings'][$i]['BestTime']);
-				}
-				else if ($gamemode == Gameinfo::SCPT) {
-						$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'];
-				}
-				else if ($gamemode == Gameinfo::TA) {
-					$re_scores['LiveRankings'][$i]['score'] = re_formatTime($re_cache['CurrentRankings'][$i]['BestTime']);
-				}
-				else if ($gamemode == Gameinfo::TEAM) {
-					// Player(Team) with score
-					$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'];
-				}
-				else if ($gamemode == Gameinfo::LAPS) {
-					// Display Checkpoints instead Time?
-					if ($re_config['LIVE_RANKINGS'][0]['GAMEMODE'][0][$gamemode][0]['DISPLAY_TYPE'][0] == true) {
-						$re_scores['LiveRankings'][$i]['score'] = re_formatTime($re_cache['CurrentRankings'][$i]['BestTime']);
-					}
-					else {
-						if ( ( isset($re_config['Challenge']['NbCheckpoints']) ) && ( isset($re_config['Challenge']['NbLaps']) ) ) {
-							$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'] .'/'. ($re_config['Challenge']['NbCheckpoints'] * $re_config['Challenge']['NbLaps']);
-						}
-						else {
-							$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'] . (($re_cache['CurrentRankings'][$i]['Score'] == 1) ? ' cp.' : ' cps.');
-						}
-					}
-				}
-				else if ($gamemode == Gameinfo::RNDS) {
-					if ( isset($re_config['CurrentGameInfos']['CupPointsLimit']) ) {
-						$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'] .'/'. $re_config['CurrentGameInfos']['CupPointsLimit'];
-					}
-					else {
-						$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'];
-					}
-				}
-				else if ($gamemode == Gameinfo::STNT) {
-					$re_scores['LiveRankings'][$i]['score'] = $re_cache['CurrentRankings'][$i]['Score'];
-				}
-			}
-			else if ($gamemode == Gameinfo::TEAM) {
-				// Team without score
-				$re_scores['LiveRankings'][$i]['score']		= 0;
-				$re_scores['LiveRankings'][$i]['login']		= $re_cache['CurrentRankings'][$i]['Login'];
-				$re_scores['LiveRankings'][$i]['nickname']	= $re_cache['CurrentRankings'][$i]['NickName'];
-			}
+			if ($i != 0 && $data['points'] == $re_scores['LiveRankings'][$i-1]['score'])
+				$re_scores['LiveRankings'][$i]['rank'] = $re_scores['LiveRankings'][$i-1]['rank'];
+			else
+				$re_scores['LiveRankings'][$i]['rank'] = $i+1;
+			$re_scores['LiveRankings'][$i]['login']		= $login;
+			$re_scores['LiveRankings'][$i]['nickname']	= re_handleSpecialChars($data['name']);
+			$re_scores['LiveRankings'][$i]['score'] = $data['points'];
 			$i++;
 		}
-
-		if ($gamemode == Gameinfo::TEAM) {
-			// Was TeamPointsLimit set?
-			if ( isset($re_config['CurrentGameInfos']['TeamPointsLimit']) ) {
-				$re_scores['LiveRankings'][0]['score'] = $re_scores['LiveRankings'][0]['score'] .'/'. $re_config['CurrentGameInfos']['TeamPointsLimit'];
-				$re_scores['LiveRankings'][1]['score'] = $re_scores['LiveRankings'][1]['score'] .'/'. $re_config['CurrentGameInfos']['TeamPointsLimit'];
-			}
-		}
-
 		$re_config['States']['LiveRankings']['NoRecordsFound'] = false;
-	}
-	else {
+	} else {
 		$re_config['States']['LiveRankings']['NoRecordsFound'] = true;
 	}
 }
@@ -11167,7 +11109,7 @@ function re_buildCloseToYouArray ($records, $preset, $ctuCount, $topCount) {
 		}
 
 		$entry = $records[$i];
-		$entry['rank'] = $i + 1;
+		$entry['rank'] = $records[$i]['rank'];
 		if ($isbetter) {
 			if ($records[$i]['login'] == $login) {
 				$self = $entry;
@@ -17988,8 +17930,6 @@ function chat_save($aseco, $command) {
 		}
 	}
 
-	$new_csv = array(); // Performance can be improved by writing to a new file instead of using another array.
-
 	if (($handle_read = fopen($csv_file,'r')) === false) {
 		show_error($command['author']->login, "No read ".$csv_file." access", true);
 		return;
@@ -18019,6 +17959,8 @@ function chat_save($aseco, $command) {
 	fclose($handle_read);
 
 	$i = 0;
+	$points_check = -1;
+	$points_check_points = -1;
 	foreach ($enduro_total_points as $plogin => &$pdata) { // Overwrite, new sortation
 		$pnickname = re_handleSpecialChars(stripColors($pdata['name']), false);
 		if (isset($csv_points[$plogin])) {
@@ -18033,13 +17975,18 @@ function chat_save($aseco, $command) {
 		if ($save_total_points) {
 			$data[] = $pdata['points'];
 		} else {
-			if (isset($enduro_points[$i])) {
-				$points = (int)$enduro_points[$i];
-				$i++;
+			if ($pdata['points'] == $points_check) {
+				$points = $points_check_points;
 			} else {
-				$points = (int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0];
+				if (isset($enduro_points[$i]))
+					$points = (int)$enduro_points[$i];
+				else
+					$points = (int)$re_config['ENDURO_CUP'][0]['POINTS_LAST'][0];
+				$points_check = $pdata['points'];
+				$points_check_points = $points;
 			}
 			$data[] = $points;
+			$i++;
 		}
 		calculate_total_and_best_points($data, $number);
 		fputcsv($handle_write, $data, ";");
