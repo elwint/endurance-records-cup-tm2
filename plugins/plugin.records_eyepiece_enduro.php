@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V5.2";
+$enduro_version = "V5.3";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,7 +15,7 @@ $enduro_version = "V5.2";
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (11-2017)
+ * Modified by: Virtex (fsxelw) (02-2018)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -245,7 +245,7 @@ Aseco::addChatCommand('fakeplayer', 'Connect/disconnect/simulate fakeplayer(s)')
 #///////////////////////////////////////////////////////////////////////#
 */
 
-global $re_config, $re_scores, $re_cache, $enduro_total_points, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $finishtime, $lastcptime, $decreaser, $chat_mute_all;
+global $re_config, $re_scores, $re_cache, $enduro_total_points, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $shitfest, $finishtime, $lastcptime, $decreaser, $chat_mute_all;
 $enduro_total_points = array();
 $finishtime = array();
 $lastcptime = array();
@@ -256,6 +256,7 @@ $roundsdone = 0;
 $mapsdone = 0;
 $enduro = false;
 $enduro_normal = false;
+$shitfest = false;
 $chat_mute_all = false;
 
 function re_onSync ($aseco, $reload = null) {
@@ -320,6 +321,9 @@ function re_onSync ($aseco, $reload = null) {
 	}
 	if (!isset($re_config['ENDURO_CUP'][0]['SAVE_CSV'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "save_csv" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+	}
+	if (!isset($re_config['ENDURO_CUP'][0]['SAVE_CSV_SHITFEST'][0])) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "save_csv_shitfest" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
 	
 	if (!$whitelist = file($re_config['ENDURO_CUP'][0]['WHITELIST'][0], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) {
@@ -4959,7 +4963,7 @@ function re_onBeginRound ($aseco) {
 */
 
 function re_onEndRound ($aseco) {
-	global $re_config, $re_cache, $rounds, $roundsdone, $maps, $mapsdone, $enduro, $lastcptime;
+	global $re_config, $re_cache, $rounds, $roundsdone, $maps, $mapsdone, $enduro, $shitfest, $lastcptime;
 
 	if ($enduro) {
 		$roundsdone++;
@@ -5034,7 +5038,25 @@ function re_onEndRound ($aseco) {
 				$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zNext: map ' . ($mapsdone+1) . '/' . $maps . '.'));
 			}
 		}
-		
+	} elseif ($shitfest) {
+		$aseco->client->query('GetModeScriptVariables');
+		$vars = $aseco->client->getResponse();
+		$scores = array_filter(explode(",", $vars["enduro_scores"]));
+		foreach ($scores as &$score) {
+			$data = explode(":",$score);
+			$player_login = $data[0];
+			$points = (int)$data[1];
+			updatePoints($aseco->getPlayerId($player_login), $points);
+			if (isset($aseco->server->players->player_list[$player_login])) {
+				$aseco->client->query('ChatSendServerMessageToLogin', $aseco->formatColors('$z$s$FF0> [$F00INFO$FF0] $zYou have $FFF' . $points . '$z points.'), $player_login);
+			}
+		}
+		getPoints();
+		$re_config['States']['LiveRankings']['NeedUpdate']	= true;
+		$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
+		// Force the refresh
+		$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
+		re_buildRecordWidgets();
 	} else {
 		// Get current Gamemode
 		$gamemode = $aseco->server->gameinfo->mode;
@@ -5082,6 +5104,17 @@ function getPoints() {
 function addPoints($player_id, $points) {
 	$query = 'UPDATE players_extra
 			  SET RoundPoints = RoundPoints + ' . $points . '
+			  WHERE PlayerId=' . $player_id;
+	$result = mysql_query($query);
+
+	if ($result === false || mysql_affected_rows() == -1) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not add points of player! (' . mysql_error() . ')' . CRLF . 'sql = ' . $query, E_USER_WARNING);
+	}
+}
+
+function updatePoints($player_id, $points) {
+	$query = 'UPDATE players_extra
+			  SET RoundPoints = ' . $points . '
 			  WHERE PlayerId=' . $player_id;
 	$result = mysql_query($query);
 
@@ -5138,13 +5171,14 @@ function getPlayerNickName($player_login) {
 
 // $rounds_points is imported from plugin.rpoints.php
 function re_onBeginMap ($aseco, $map_item) {
-	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $map_cps, $enduro_version, $chat_mute_all;
+	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $shitfest, $map_cps, $enduro_version, $chat_mute_all;
 
 	// Get current Gamemode
 	$gamemode = $aseco->server->gameinfo->mode;
 
 	$enduro = false;
 	$enduro_normal = false;
+	$shitfest = false;
 	if ($gamemode == Gameinfo::SCPT) {
 		$aseco->client->query('GetScriptName');
 		$dat = $aseco->client->getResponse();
@@ -5152,6 +5186,8 @@ function re_onBeginMap ($aseco, $map_item) {
 			$enduro = true;
 		} elseif (strpos(mb_strtolower($dat['CurrentValue']), 'endurance.script.txt') !== false) {
 			$enduro_normal = true;
+		} elseif (strpos(mb_strtolower($dat['CurrentValue']), 'shitfest.script.txt') !== false) {
+			$shitfest = true;
 		}
 	}
 
@@ -5160,6 +5196,15 @@ function re_onBeginMap ($aseco, $map_item) {
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
 		if (strpos($vars["version"], $enduro_version . '-cup') === false) {
+			trigger_error('[plugin.records_eyepiece_enduro.php] Version mismatch! (Plugin: "' . $enduro_version . '" Script: "' .  $vars["version"] . '")', E_USER_WARNING);
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Version mismatch!'));
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Plugin: ' . $enduro_version));
+			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Script: ' . $vars["version"]));
+		}
+	} elseif ($shitfest) {
+		$aseco->client->query('GetModeScriptVariables');
+		$vars = $aseco->client->getResponse();
+		if (strpos($vars["version"], 'EnduroCompatible' . $enduro_version) === false) {
 			trigger_error('[plugin.records_eyepiece_enduro.php] Version mismatch! (Plugin: "' . $enduro_version . '" Script: "' .  $vars["version"] . '")', E_USER_WARNING);
 			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Version mismatch!'));
 			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Plugin: ' . $enduro_version));
@@ -17697,7 +17742,7 @@ function chat_setmaps($aseco, $command) {
 }
 
 function chat_switch($aseco, $command) {
-	global $enduro, $decreaser;
+	global $decreaser;
 
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
@@ -17725,11 +17770,13 @@ function chat_switch($aseco, $command) {
 	
 	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zSwitching to ' . $command['params'][1]));
 	$aseco->console('Switching to ' . $command['params'][1]);
-	if ($enduro) {
-		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points frozen'));
-	} else if (strpos(mb_strtolower($command['params'][1]) . '.script.txt', 'endurocup.script.txt') !== false) {
+	if (strpos(mb_strtolower($command['params'][1]) . '.script.txt', 'endurocup.script.txt') !== false) {
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zDecreaser: $FFF' . $decreaser . '$z (multiplication per CP)'));
 		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zPoints system: /points'));
+	} elseif (strpos(mb_strtolower($command['params'][1]) . '.script.txt', 'shitfest.script.txt') !== false) {
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zShitfest script detected'));
+	} else {
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points frozen'));
 	}
 	if ($command['params'][0] == "res") {
 		$aseco->client->query('RestartMap');
@@ -17906,20 +17953,27 @@ function re_onChat($aseco, $chat) {
 }
 
 function chat_save($aseco, $command) {
-	global $re_config, $enduro_total_points;
+	global $re_config, $enduro_total_points, $enduro, $shitfest;
 
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
-	$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+	if ($enduro) {
+		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+	} elseif ($shitfest) {
+		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV_SHITFEST'][0];
+	} else {
+		show_error($command['author']->login, 'Current gamemode not supported');
+        return;
+	}
 	$save_total_points = $re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0];
 	if ($save_total_points) {
 		$type_points = "Total points";
 	} else {
 		$enduro_points = explode(",",$re_config['ENDURO_CUP'][0]['POINTS'][0]);
-		$type_points = "Points (according to rounds points)";
+		$type_points = "Points (according to enduro rounds points)";
 	}
 
 	if (!file_exists($csv_file)) {
@@ -18009,9 +18063,16 @@ function chat_save($aseco, $command) {
 }
 
 function remove_last_points() {
-	global $aseco, $re_config;
+	global $aseco, $re_config, $enduro, $shitfest;
 
-	$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+	if ($enduro) {
+		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+	} elseif ($shitfest) {
+		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV_SHITFEST'][0];
+	} else {
+		show_error($command['author']->login, 'Current gamemode not supported');
+        return;
+	}
 	if (!file_exists($csv_file)) return;
 	if (($handle_read = fopen($csv_file,'r')) !== false && ($handle_write = fopen($csv_file.'.temp','w')) !== false) {
 		$header = fgetcsv($handle_read, 1000, ";");

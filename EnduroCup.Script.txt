@@ -1,7 +1,7 @@
 ﻿/*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduroCup by Virtex (fsxelw) (11-2017)
+Modified to EnduroCup by Virtex (fsxelw) (02-2018)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,12 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #Include "Libs/Nadeo/TrackMania/TM3.Script.txt" as TM
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
 #Include "Libs/Nadeo/ModeInfo.Script.txt" as ModeInfo
-#Const	Version				"V5.2-cup V1.4b-alpha"
+#Const	Version				"V5.3-cup V1.4b-alpha"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
 #Const WarmupTimeNewMap 		23000	// WARMING UP TIME FIRST ROUND IN MS (1000 = 1 second)
-#Const WarmupTime 				8000	// WARMING UP TIME IN MS (1000 = 1 second)
+#Const WarmupTime 				15000	// WARMING UP TIME IN MS (1000 = 1 second)
 #Const TimeMargeP1				30000   // START TIME MARGE
 #Const TimeMargeP2				0.95    // DEFAULT MULTIPLICATION PER CP (Generally <= 1.0)
 #Const RoundEndWait				5000	// WAITING TIME AT ROUNDEND in MS (1000 = 1 second)
@@ -175,8 +175,8 @@ Text MLGet_ScoreTable(Boolean EndRound) {
 				if ({{{EndRound}}}) Blink = Now;
 
 				// TODO: Load points array from xml
-				declare Integer[] PointsArray = [500,450,400,360,320,290,260,240,220,205,190,180,170,160,152,145,140,135,130,126,122,118,114,110,107,104,101,98,95,92,89,87,85,83,81,79,77,75,73,71,69,67,65,63,61,59,57,55,53,51,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
-				declare Integer PointsLast = 0;
+				declare Integer[] PointsArray = [750,720,690,660,645,630,615,600,585,570,558,546,534,522,510,498,486,474,462,450,440,430,420,410,400,390,380,370,360,351,342,333,324,315,306,298,290,282,274,266,258,251,244,237,230,224,218,212,206,200,195,190,185,180,175,170,166,162,158,154,150,146,142,138,134,130,127,124,121,118,115,112,109,106,103,100,98,96,94,92,90,88,86,84,82,80,78,76,74,72,70,68,66,64,62,60,58,56,54,52,50,49,48,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
+				declare Integer PointsLast = 1;
 
 				declare CMlQuad quadPlayerAvatar <=> (Page.GetFirstChild("playerinfo_avatar") as CMlQuad);
 				declare CMlLabel lblServerName <=> (Page.GetFirstChild("additionnalinfo_servername") as CMlLabel);
@@ -873,13 +873,13 @@ main() {
 	ModeInfo::SetRules(Description);
 	ModeInfo::SetStatusMessage(StatusMessage);
 
-	declare netwrite version for XmlRpc = Version;
+	declare netwrite Text version for XmlRpc;
 	version = Version;
-	declare netwrite enduro_scores for XmlRpc = "";
+	declare netwrite Text enduro_scores for XmlRpc;
 	enduro_scores = "";
 	declare netread decreaser for XmlRpc = TimeMargeP2;
 	declare netread sim_cptime for XmlRpc = SimulateFakeplayerCP;
-	declare netread Boolean last_round for XmlRpc = False;
+	declare netread last_round for XmlRpc = False;
 	IndependantLaps = False;
 	NbLaps = 0;
 	UiRounds = True;
