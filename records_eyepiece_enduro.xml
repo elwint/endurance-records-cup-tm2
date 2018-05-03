@@ -16,11 +16,11 @@
 		<!-- If true, /save will save the total points as final points. If false, /save will save the final points according to the rounds points based on the total points -->
 		<save_total_points>false</save_total_points>
 
-		<!-- CSV file to store the (final) points when using /save -->
+		<!-- CSV file to store the final points when using /save -->
 		<save_csv>enduro_results.csv</save_csv>
 
 		<!-- Shitfest script settings -->
-		<!-- CSV file to store the (final) points when using /save -->
+		<!-- CSV file to store the total points when using /save -->
 		<save_csv_shitfest>shitfest_results.csv</save_csv_shitfest>
 	</enduro_cup>
 

@@ -1,18 +1,26 @@
-# EnduroCup script and XAseco2 plugin [TM2][MP4]
+# [DEPRECATING] EnduroCup script and XAseco2 plugin [TM2][MP4]
 
 ![screenshot example](https://drive.google.com/uc?export=view&id=1iemqrSLBSlt_0stk6Fe0ifcz3ybUNOOX)
+
+## Original authors
+
+Endurance script: TGYoshi/Tiggs
+
+Records Eyepiece: undef.de
 
 ## Modified Records Eyepiece plugin
 
 Works in MP4 with XAseco2.
 
-Support for: `EnduroCup.Script.txt` & `TimeAttack.Script.txt`
+Support for: `EnduroCup.Script.txt` & `TimeAttack.Script.txt` (and a custom shitfest script (not included))
 
 Features: Total points system, local records, control EnduroCup settings in-game, extra commands.
 
 ## Warning
 
 Don't excpect it to be 100% bug free. A lot of improvements of the original code still needs to be done.
+
+It probably contains some vulnerabilities as well...
 
 ## Installation
 

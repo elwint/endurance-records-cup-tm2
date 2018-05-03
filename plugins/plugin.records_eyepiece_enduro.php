@@ -15,7 +15,7 @@ $enduro_version = "V5.3";
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (02-2018)
+ * Modified by: Virtex (fsxelw) (04-2018)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -17962,13 +17962,14 @@ function chat_save($aseco, $command) {
 
 	if ($enduro) {
 		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV'][0];
+		$save_total_points = $re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0];
 	} elseif ($shitfest) {
 		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV_SHITFEST'][0];
+		$save_total_points = true;
 	} else {
 		show_error($command['author']->login, 'Current gamemode not supported');
         return;
 	}
-	$save_total_points = $re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0];
 	if ($save_total_points) {
 		$type_points = "Total points";
 	} else {
@@ -18023,7 +18024,7 @@ function chat_save($aseco, $command) {
 		} else { // New player
 			$data = array($pnickname, $plogin);
 			for ($j = 1; $j < $number; $j++) {
-				$data[] = "-";
+				$data[] = "0";
 			}
 		}
 		if ($save_total_points) {
@@ -18048,7 +18049,7 @@ function chat_save($aseco, $command) {
 	}
 
 	foreach ($csv_points as $key => &$data) { // Old player not participated
-		$data[] = "-";
+		$data[] = "0";
 		calculate_total_and_best_points($data, $number);
 		fputcsv($handle_write, $data, ";");
 	}
@@ -18062,7 +18063,7 @@ function chat_save($aseco, $command) {
 	}
 }
 
-function remove_last_points() {
+function remove_last_points($login) {
 	global $aseco, $re_config, $enduro, $shitfest;
 
 	if ($enduro) {
@@ -18070,7 +18071,7 @@ function remove_last_points() {
 	} elseif ($shitfest) {
 		$csv_file = $re_config['ENDURO_CUP'][0]['SAVE_CSV_SHITFEST'][0];
 	} else {
-		show_error($command['author']->login, 'Current gamemode not supported');
+		show_error($login, 'Current gamemode not supported');
         return;
 	}
 	if (!file_exists($csv_file)) return;
@@ -18113,7 +18114,7 @@ function chat_y($aseco, $command) {
 	if (isset($confirm_func)) {
 		if ($command['author']->login != $confirm_func[1]) return;
 		if ((time()-$confirm_func[2]) < 60) {
-			$confirm_func[0]();
+			$confirm_func[0]($confirm_func[1]);
 		}
 		unset($GLOBALS['confirm_func']);
 	}
