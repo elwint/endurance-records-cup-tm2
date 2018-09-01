@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V5.3";
+$enduro_version = "V5.3.2";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,7 +15,7 @@ $enduro_version = "V5.3";
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (04-2018)
+ * Modified by: Virtex (fsxelw) (09-2018)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -5191,25 +5191,24 @@ function re_onBeginMap ($aseco, $map_item) {
 		}
 	}
 
+	$version_check = substr($enduro_version, 0, 4);
+	$verror = false;
 	if ($enduro) {
 		$roundsdone = 0;
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
-		if (strpos($vars["version"], $enduro_version . '-cup') === false) {
-			trigger_error('[plugin.records_eyepiece_enduro.php] Version mismatch! (Plugin: "' . $enduro_version . '" Script: "' .  $vars["version"] . '")', E_USER_WARNING);
-			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Version mismatch!'));
-			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Plugin: ' . $enduro_version));
-			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Script: ' . $vars["version"]));
-		}
+		$verror = substr($vars["version"], 0, 4) != $version_check;
 	} elseif ($shitfest) {
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
-		if (strpos($vars["version"], 'EnduroCompatible' . $enduro_version) === false) {
-			trigger_error('[plugin.records_eyepiece_enduro.php] Version mismatch! (Plugin: "' . $enduro_version . '" Script: "' .  $vars["version"] . '")', E_USER_WARNING);
-			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Version mismatch!'));
-			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Plugin: ' . $enduro_version));
-			$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Script: ' . $vars["version"]));
-		}
+		$verror = strpos($vars["version"], 'EnduroCompatible' . $version_check) === false;
+	}
+
+	if ($verror) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Version not compatible! (Plugin: "' . $enduro_version . '" Script: "' .  $vars["version"] . '")', E_USER_WARNING);
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Version not compatible!'));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Plugin: ' . $enduro_version));
+		$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00WARNING$FF0] $z$i{#error}Script: ' . $vars["version"]));
 	}
 
 	$aseco->client->query('ChatEnableManualRouting', $chat_mute_all, true);
