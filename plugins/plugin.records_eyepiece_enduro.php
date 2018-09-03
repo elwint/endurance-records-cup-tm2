@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V5.3.2";
+$enduro_version = "V5.3.3";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -245,15 +245,16 @@ Aseco::addChatCommand('fakeplayer', 'Connect/disconnect/simulate fakeplayer(s)')
 #///////////////////////////////////////////////////////////////////////#
 */
 
-global $re_config, $re_scores, $re_cache, $enduro_total_points, $rounds, $maps, $roundsdone, $mapsdone, $enduro, $enduro_normal, $shitfest, $finishtime, $lastcptime, $decreaser, $chat_mute_all;
+global $re_config, $re_scores, $re_cache, $enduro_total_points, $rounds, $maps, $roundsdone, $mapsdone, $scriptname, $enduro, $enduro_normal, $shitfest, $finishtime, $lastcptime, $decreaser, $chat_mute_all;
 $enduro_total_points = array();
 $finishtime = array();
 $lastcptime = array();
-$rounds = 3;
+$rounds = 10;
 $maps = 1;
 $decreaser = 0.95; // Must be same as TimeMargeP2 in script
 $roundsdone = 0;
 $mapsdone = 0;
+$scriptname = '';
 $enduro = false;
 $enduro_normal = false;
 $shitfest = false;
@@ -5171,22 +5172,24 @@ function getPlayerNickName($player_login) {
 
 // $rounds_points is imported from plugin.rpoints.php
 function re_onBeginMap ($aseco, $map_item) {
-	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $shitfest, $map_cps, $enduro_version, $chat_mute_all;
+	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $shitfest, $map_cps, $enduro_version, $chat_mute_all, $scriptname;
 
 	// Get current Gamemode
 	$gamemode = $aseco->server->gameinfo->mode;
 
+	$scriptname = '';
 	$enduro = false;
 	$enduro_normal = false;
 	$shitfest = false;
 	if ($gamemode == Gameinfo::SCPT) {
 		$aseco->client->query('GetScriptName');
 		$dat = $aseco->client->getResponse();
-		if (strpos(mb_strtolower($dat['CurrentValue']), 'endurocup.script.txt') !== false) {
+		$scriptname = mb_strtolower(substr(basename($dat['CurrentValue']), 0, -11));
+		if ($scriptname == 'endurocup') {
 			$enduro = true;
-		} elseif (strpos(mb_strtolower($dat['CurrentValue']), 'endurance.script.txt') !== false) {
+		} elseif ($scriptname == 'endurance') {
 			$enduro_normal = true;
-		} elseif (strpos(mb_strtolower($dat['CurrentValue']), 'shitfest.script.txt') !== false) {
+		} elseif ($scriptname == 'shitfest') {
 			$shitfest = true;
 		}
 	}
@@ -7445,13 +7448,12 @@ function re_buildRecordWidgets ($target = false, $force = false) {
 
 function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 	global $aseco, $re_config;
-
+	global $NouseMessage, $scriptname, $roundsdone, $rounds;
 
 	$xml  = '<?xml version="1.0" encoding="UTF-8"?>';
 	$xml .= '<manialinks>';
 	$xml .= $widgets;
 	$xml .= '</manialinks>';
-
 
 	$xml = preg_replace('/(<manialink id="(\d+)">)/', '<manialink id="${2}" version="1">', $xml);
 	$xml = preg_replace_callback('/posn="(\S+) (\S+) (\S+)"/', 're_convertPosnToVersion1', $xml);
@@ -7460,6 +7462,46 @@ function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 	$xml = preg_replace('/style="Icons64x64_1" substyle="Maximize"/', 'style="Bgs1" substyle="BgButton"', $xml);
 	$xml = preg_replace('/style="Icons64x64_1" substyle="ArrowUp"/', 'style="Icons64x64_1" substyle="ClipPause"', $xml);
 	$xml = preg_replace('/file:\/\/Skins\/Avatars\/Flags\//', 'file://Media/Flags/', $xml);
+
+	if ($NouseMessage) {
+		$NouseMessage->message_loadSettings();
+
+		$msgs = array();
+		$aseco->client->query('GetServerPassword');
+		foreach ($NouseMessage->msginfotext as $msg) {
+			$msg = str_ireplace(
+				array(
+					'%current_round%',
+					'%rounds%',
+					'%password%'
+				),
+				array(
+					$roundsdone+1,
+					$rounds,
+					$aseco->client->getResponse()
+				),
+				$msg
+			);
+
+			if (stripos($msg, '{'.$scriptname.'}') === 0) {
+				$msgs[] = substr($msg, strlen($scriptname)+2);
+			} elseif (strpos($msg, '{') !== 0) {
+				$msgs[] = $msg;
+			}
+		}
+
+		if (count($msgs) == 0) {
+			$msgs[] = '';
+		}
+		$NouseMessage->msginfotext = $msgs;
+		// Count bug fix
+		$ref = new ReflectionClass('NouseMessage');
+		$count = $ref->getProperty('count');
+		$count->setAccessible(true);
+		if ($count->getValue($NouseMessage) >= count($msgs)) {
+			$count->setValue($NouseMessage, 0);
+		}
+	}
 
 	if ($login != false) {
 		// Send to given Player
@@ -17741,7 +17783,7 @@ function chat_setmaps($aseco, $command) {
 }
 
 function chat_switch($aseco, $command) {
-	global $decreaser;
+	global $scriptname, $decreaser;
 
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
@@ -17754,9 +17796,8 @@ function chat_switch($aseco, $command) {
 		return;
 	}
 	
-	$aseco->client->query('GetScriptName');
-	$dat = $aseco->client->getResponse();
-	if (strpos(mb_strtolower($dat['CurrentValue']), mb_strtolower($command['params'][1]) . '.script.txt') !== false) {
+
+	if ($scriptname == mb_strtolower(basename($command['params'][1]))) {
 		show_error($command['author']->login, 'Can\'t switch to the same script!');
         return;
 	}

@@ -55,9 +55,21 @@ A working example of `plugins.xml` can be found in the repository.
 
 ## Configuration
 
-The config file `records_eyepiece_enduro.xml` will be used for `plugin.records_eyepiece_enduro.php`
+The config file is `records_eyepiece_enduro.xml`
 
-**Note:** when changing the points, change it in `EnduroCup.Script.txt` as well.
+**Note:** when changing the points, change it in `EnduroCup.Script.txt` as well to show the correct points on the scoreboard.
+
+### Nouse Message
+
+There is additional support for `plugin.nouse.message.php`
+
+```xml
+<infotext>General message</infotext>
+<infotext>{*scriptname*}This message is only visible in the specified script</infotext>
+<infotext>{TimeAttack}This message is only visible in TimeAttack</infotext>
+<infotext>{Endurocup}Current Round: %current_round%/%rounds%</infotext>
+<infotext>{Endurocup}Server password: %password%</infotext>
+```
 
 ## Commands
 
