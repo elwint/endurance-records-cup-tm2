@@ -1,7 +1,7 @@
 ﻿/*
 Endurance Gamemode for TrackMania 2
 Copyright (C) 2013 TGYoshi/Tiggs
-Modified to EnduroCup by Virtex (fsxelw) (02-2018)
+Modified to EnduroCup by Virtex (fsxelw) (09-2018)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #Include "Libs/Nadeo/TrackMania/TM3.Script.txt" as TM
 #Include "Libs/Nadeo/TrackMania/WarmUp.Script.txt" as WarmUp
 #Include "Libs/Nadeo/ModeInfo.Script.txt" as ModeInfo
-#Const	Version				"V5.3-cup V1.4b-alpha"
+#Const	Version				"V5.3.3-cup V1.4b-alpha"
 
 //// GENERIC SETTINGS ////
 #Const PlayersReq 				2		// PLAYERS REQUIRED BEFORE THE GAME STARTS (Generally >= 2)
@@ -1117,11 +1117,9 @@ main() {
 				declare netwrite Integer Net_KnockOut for UI;
 				Net_KnockOut = 0;
 				Player.Score.Clear();
+				Player.Score.Points = 0;
 				if (Players.exists(Player)) {
 					Player.RaceStartTime = Now+5000;
-					declare Integer LapStart for Player = 0;
-					LapStart = Player.RaceStartTime;
-					Player.Score.Points = 0;
 				}
 			}
 			foreach (Player in AllPlayers) {
@@ -1155,7 +1153,6 @@ main() {
 						declare UI <=> UIManager.GetUI(FakePlayer);
 						if (UI == Null) continue;
 						declare Integer CP for FakePlayer;
-						declare Integer LapStart for FakePlayer = 0;
 						CP += 1;
 						declare Integer CP as CPScore for FakePlayer.Score;
 						CPScore = CP;
@@ -1207,7 +1204,6 @@ main() {
 									Net_AfterCPTimeLeft = Net_ReachTimes[CP+1]-E.Player.RaceStartTime-E.RaceTime;
 								}
 							}
-							declare Integer LapStart for E.Player = 0;
 							CP += 1;
 							declare Integer CP as CPScore for E.Player.Score;
 							CPScore = CP;
@@ -1216,7 +1212,6 @@ main() {
 
 							declare netwrite Integer Net_CP for UI;
 							Net_CP = CP;
-							// if (E.Player.Score.Points < CP)
 							if (PlayersReached[CP] > 1000)
 								E.Player.Score.Points = CP*1000;
 							else
@@ -1368,8 +1363,6 @@ main() {
 					declare UsedLayers = Ident[];
 
 					foreach (Player in AllPlayers) {
-						if (!Players.exists(Player))
-							Player.Score.Points = 0;
 						declare UI <=> UIManager.GetUI(Player);
 						if (UI == Null) continue;
 
