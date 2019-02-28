@@ -1,4 +1,6 @@
-# [DEPRECATING] EnduroCup script and XAseco2 plugin [TM2][MP4]
+# EnduroCup script and XAseco2 plugin [TM2][MP4] (deprecated)
+
+***This script/plugin is no longer maintained***
 
 ![screenshot example](https://drive.google.com/uc?export=view&id=1iemqrSLBSlt_0stk6Fe0ifcz3ybUNOOX)
 
@@ -18,13 +20,11 @@ Features: Total points system, local records, control EnduroCup settings in-game
 
 ## Warning
 
-Don't excpect it to be 100% bug free. A lot of improvements of the original code still needs to be done.
-
-It probably contains some vulnerabilities as well...
+The code is old, it might contain some vulnerabilities. Don't excpect it to be 100% bug free. A lot of improvements to the original code still needs to be done.
 
 ## Installation
 
-Place the plugin file in the XAseco2 plugin folder and the script in the Scripts folder of your dedicated server.
+Put the plugin file in the XAseco2 plugin folder, the config file in the XAseco2 folder and the script in the Scripts folder of your dedicated server.
 
 Edit your `plugins.xml` of XAseco2:
 
@@ -57,7 +57,7 @@ A working example of `plugins.xml` can be found in the repository.
 
 The config file is `records_eyepiece_enduro.xml`
 
-**Note:** when changing the points, change it in `EnduroCup.Script.txt` as well to show the correct points on the scoreboard.
+**Note:** if you want to change the points, update it both in the config file and in `EnduroCup.Script.txt` to show the correct points on the scoreboard.
 
 ### Nouse Message
 
