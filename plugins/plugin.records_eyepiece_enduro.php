@@ -1,6 +1,6 @@
 <?php
 global $enduro_version;
-$enduro_version = "V5.3.3";
+$enduro_version = "V5.3.4";
 /*
  * Plugin: Records Eyepiece (EnduroCup)
  * ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,7 +15,7 @@ $enduro_version = "V5.3.3";
  * Copyright:		2009 - 2013 by undef.de
  * System:		XAseco2/1.02+
  * Game:		ManiaPlanet Trackmania2 (TM2)
- * Modified by: Virtex (fsxelw) (09-2018)
+ * Modified by: Virtex (fsxelw) (03-2019)
  * ----------------------------------------------------------------------------------
  *
  * LICENSE: This program is free software: you can redistribute it and/or modify
@@ -314,6 +314,9 @@ function re_onSync ($aseco, $reload = null) {
 	if (!isset($re_config['ENDURO_CUP'][0]['POINTS_LAST'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "points_last" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
+	if (!isset($re_config['ENDURO_CUP'][0]['AUTO_RESET'][0])) {
+		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "auto_reset" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
+	}
 	if (!isset($re_config['ENDURO_CUP'][0]['WHITELIST'][0])) {
 		trigger_error('[plugin.records_eyepiece_enduro.php] Could not find "whitelist" in config file "records_eyepiece_enduro.xml"!', E_USER_ERROR);
 	}
@@ -332,6 +335,7 @@ function re_onSync ($aseco, $reload = null) {
 	}
 	
 	// Transform 'TRUE' or 'FALSE' from string to boolean
+	$re_config['ENDURO_CUP'][0]['AUTO_RESET'][0] = ((strtoupper($re_config['ENDURO_CUP'][0]['AUTO_RESET'][0]) == 'TRUE') ? true : false);
 	$re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0] = ((strtoupper($re_config['ENDURO_CUP'][0]['SAVE_TOTAL_POINTS'][0]) == 'TRUE') ? true : false);
 	$re_config['MAP_WIDGET'][0]['ENABLED'][0]					= ((strtoupper($re_config['MAP_WIDGET'][0]['ENABLED'][0]) == 'TRUE')					? true : false);
 	$re_config['WELCOME_WINDOW'][0]['ENABLED'][0]					= ((strtoupper($re_config['WELCOME_WINDOW'][0]['ENABLED'][0]) == 'TRUE')				? true : false);
@@ -5125,7 +5129,7 @@ function updatePoints($player_id, $points) {
 }
 
 function resetPoints() {
-	global $enduro_total_points, $lastcptime;
+	global $enduro_total_points, $lastcptime, $re_config;
 
 	$query = 'UPDATE players_extra
 			  SET RoundPoints = 0';
@@ -5145,6 +5149,12 @@ function resetPoints() {
 			unset($lastcptime[$player_login]);
 		}
 	}
+	
+	$re_config['States']['LiveRankings']['NeedUpdate']	= true;
+	$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
+	// Force the refresh
+	$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
+	re_buildRecordWidgets();
 }
 
 function ordinal($number) {
@@ -5172,7 +5182,7 @@ function getPlayerNickName($player_login) {
 
 // $rounds_points is imported from plugin.rpoints.php
 function re_onBeginMap ($aseco, $map_item) {
-	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $enduro, $enduro_normal, $shitfest, $map_cps, $enduro_version, $chat_mute_all, $scriptname;
+	global $re_config, $re_cache, $re_scores, $rounds_points, $rounds, $roundsdone, $mapsdone, $enduro, $enduro_normal, $shitfest, $map_cps, $enduro_version, $chat_mute_all, $scriptname;
 
 	// Get current Gamemode
 	$gamemode = $aseco->server->gameinfo->mode;
@@ -5201,6 +5211,7 @@ function re_onBeginMap ($aseco, $map_item) {
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
 		$verror = substr($vars["version"], 0, 4) != $version_check;
+		if ($re_config['ENDURO_CUP'][0]['AUTO_RESET'][0] && $mapsdone == 0) resetPoints();
 	} elseif ($shitfest) {
 		$aseco->client->query('GetModeScriptVariables');
 		$vars = $aseco->client->getResponse();
@@ -17826,18 +17837,12 @@ function chat_switch($aseco, $command) {
 }
 
 function chat_resetpoints($aseco, $command) {
-	global $re_config;
-
     if (!$aseco->isMasterAdmin($command['author']) && !$aseco->isAdmin($command['author'])) {
 		show_error($command['author']->login, 'You don\'t have the required admin rights to do that!');
         return;
 	}
 
 	resetPoints();
-	$re_config['States']['LiveRankings']['NeedUpdate']	= true;
-	$re_config['States']['LiveRankings']['NoRecordsFound']	= false;
-	// Force the refresh
-	$re_config['States']['RefreshTimestampRecordWidgets'] = 0;
 	
 	$aseco->client->query('ChatSendServerMessage', $aseco->formatColors('$z$s$FF0>> [$F00INFO$FF0] $zTotal points has been reset'));
 }

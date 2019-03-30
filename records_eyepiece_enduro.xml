@@ -10,6 +10,9 @@
 		<!-- Points given to finished players outside the points array -->
 		<points_last>1</points_last>
 
+		<!-- Auto reset total points -->
+		<auto_reset>false</auto_reset>
+
 		<!-- Whitelist text file (everyone in the whitelist can't be kicked when using /kickall) -->
 		<whitelist>whitelist.txt</whitelist>
 
