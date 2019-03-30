@@ -7459,7 +7459,7 @@ function re_buildRecordWidgets ($target = false, $force = false) {
 
 function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 	global $aseco, $re_config;
-	global $NouseMessage, $scriptname, $roundsdone, $rounds;
+	global $NouseMessage, $scriptname, $roundsdone, $rounds, $mapsdone, $maps;
 
 	$xml  = '<?xml version="1.0" encoding="UTF-8"?>';
 	$xml .= '<manialinks>';
@@ -7484,11 +7484,15 @@ function re_sendManialink ($widgets, $login = false, $timeout = 0) {
 				array(
 					'%current_round%',
 					'%rounds%',
+					'%current_map%',
+					'%maps%',
 					'%password%'
 				),
 				array(
 					$roundsdone+1,
 					$rounds,
+					$mapsdone+1,
+					$maps,
 					$aseco->client->getResponse()
 				),
 				$msg

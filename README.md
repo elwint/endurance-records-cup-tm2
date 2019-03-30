@@ -68,6 +68,7 @@ There is additional support for `plugin.nouse.message.php`
 <infotext>{*scriptname*}This message is only visible in the specified script</infotext>
 <infotext>{TimeAttack}This message is only visible in TimeAttack</infotext>
 <infotext>{Endurocup}Current Round: %current_round%/%rounds%</infotext>
+<infotext>{Endurocup}Current Map: %current_map%/%maps%</infotext>
 <infotext>{Endurocup}Server password: %password%</infotext>
 ```
 
